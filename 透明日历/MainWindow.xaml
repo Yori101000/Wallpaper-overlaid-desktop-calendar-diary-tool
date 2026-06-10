@@ -1,0 +1,64 @@
+<Window x:Class="TransparentCalendar.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="透明日历"
+        Width="760"
+        Height="520"
+        MinWidth="480"
+        MinHeight="360"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False">
+    <Window.Resources>
+        <Style x:Key="CalendarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#20FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root" Background="Transparent" MouseLeftButtonDown="Root_MouseLeftButtonDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="12,6,12,2">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <Button Content="‹" Width="34" Height="34" Click="PreviousMonth_Click" Style="{StaticResource CalendarButtonStyle}"/>
+                <TextBlock x:Name="MonthTitle"
+                           Margin="12,0"
+                           VerticalAlignment="Center"
+                           FontWeight="Light"/>
+                <Button Content="›" Width="34" Height="34" Click="NextMonth_Click" Style="{StaticResource CalendarButtonStyle}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                <Button Content="设置" MinWidth="52" Height="34" Margin="6,0,0,0" Click="Settings_Click" Style="{StaticResource CalendarButtonStyle}"/>
+                <Button Content="×" Width="34" Height="34" Margin="6,0,0,0" Click="Close_Click" Style="{StaticResource CalendarButtonStyle}"/>
+            </StackPanel>
+        </DockPanel>
+
+        <UniformGrid x:Name="WeekHeaderGrid" Grid.Row="1" Columns="7" Margin="12,0,12,4"/>
+        <UniformGrid x:Name="CalendarGrid" Grid.Row="2" Columns="7" Rows="6" Margin="12,0,12,12"/>
+    </Grid>
+</Window>

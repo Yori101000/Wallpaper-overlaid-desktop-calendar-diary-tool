@@ -1,0 +1,75 @@
+<Window x:Class="TransparentCalendar.Views.DayEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="每日记录"
+        Width="420"
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="#F21A1A1A">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="DateTitle"
+                   FontSize="22"
+                   Foreground="White"
+                   FontWeight="Light"
+                   Margin="0,0,0,16"/>
+
+        <GroupBox Grid.Row="1" Header="待办" Foreground="White" BorderBrush="#40FFFFFF" Margin="0,0,0,14">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <ItemsControl x:Name="TodoItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,4">
+                                <Button Content="删除"
+                                        Width="46"
+                                        DockPanel.Dock="Right"
+                                        Margin="8,0,0,0"
+                                        Click="DeleteTodo_Click"/>
+                                <CheckBox IsChecked="{Binding IsDone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="8,0,0,0"
+                                         MinWidth="240"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button Grid.Row="1"
+                        Content="添加待办"
+                        HorizontalAlignment="Left"
+                        Margin="0,8,0,0"
+                        Padding="10,4"
+                        Click="AddTodo_Click"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Header="日记" Foreground="White" BorderBrush="#40FFFFFF" Margin="0,0,0,14">
+            <TextBox x:Name="DiaryText"
+                     Margin="8"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     Background="#22FFFFFF"
+                     Foreground="White"
+                     BorderBrush="#40FFFFFF"/>
+        </GroupBox>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="取消" Width="76" Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="保存" Width="76" Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
