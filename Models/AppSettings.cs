@@ -14,4 +14,6 @@ public sealed class AppSettings
     public bool StartOnBoot { get; set; }
     public bool KeepOnTop { get; set; }
     public bool AttachToDesktopLayer { get; set; }
+    public bool CloseToTray { get; set; } = true;
+    public bool StartInTray { get; set; }
 }

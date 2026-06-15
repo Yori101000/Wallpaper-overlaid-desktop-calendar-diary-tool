@@ -3,12 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="透明日历设置"
         Width="430"
-        Height="430"
+        Height="540"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#F21A1A1A">
     <Grid Margin="18">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -42,7 +43,10 @@
             <CheckBox x:Name="LockWindowCheck" Content="锁定位置和大小" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="MondayStartCheck" Content="周一作为一周开始" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="TopmostCheck" Content="始终显示在窗口上方" Foreground="White" Margin="0,0,0,8"/>
-            <CheckBox x:Name="BootCheck" Content="开机自动启动" Foreground="White"/>
+            <CheckBox x:Name="DesktopLayerCheck" Content="贴到桌面壁纸层" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="BootCheck" Content="开机自动启动" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="CloseToTrayCheck" Content="关闭后进入后台" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="StartInTrayCheck" Content="启动后进入后台" Foreground="White"/>
         </StackPanel>
 
         <Button Grid.Row="5"
@@ -52,13 +56,18 @@
                 Margin="0,0,0,12"
                 Click="OpenStorage_Click"/>
 
-        <TextBlock Grid.Row="6"
+        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="导出备份" Padding="12,6" Margin="0,0,8,0" Click="ExportBackup_Click"/>
+            <Button Content="导入备份" Padding="12,6" Click="ImportBackup_Click"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="7"
                    x:Name="StoragePathText"
                    TextWrapping="Wrap"
                    Foreground="#CCFFFFFF"
                    FontSize="12"/>
 
-        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="取消" Width="76" Margin="0,0,8,0" Click="Cancel_Click"/>
             <Button Content="保存" Width="76" Click="Save_Click"/>
         </StackPanel>

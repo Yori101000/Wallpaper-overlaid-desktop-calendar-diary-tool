@@ -37,6 +37,14 @@
                                         DockPanel.Dock="Right"
                                         Margin="8,0,0,0"
                                         Click="DeleteTodo_Click"/>
+                                <ComboBox Width="64"
+                                          Margin="8,0,0,0"
+                                          DockPanel.Dock="Right"
+                                          SelectedValue="{Binding Priority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          SelectedValuePath="Content">
+                                    <ComboBoxItem Content="普通"/>
+                                    <ComboBoxItem Content="重要"/>
+                                </ComboBox>
                                 <CheckBox IsChecked="{Binding IsDone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           VerticalAlignment="Center"/>
                                 <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

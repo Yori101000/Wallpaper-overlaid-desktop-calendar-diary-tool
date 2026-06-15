@@ -17,6 +17,7 @@ public partial class DayEditorWindow : Window
         _todos = new ObservableCollection<TodoItem>(_entry.Todos.Select(todo => new TodoItem
         {
             Text = todo.Text,
+            Priority = string.IsNullOrWhiteSpace(todo.Priority) ? "普通" : todo.Priority,
             IsDone = todo.IsDone
         }));
 
@@ -45,6 +46,7 @@ public partial class DayEditorWindow : Window
             .Select(todo => new TodoItem
             {
                 Text = todo.Text.Trim(),
+                Priority = string.IsNullOrWhiteSpace(todo.Priority) ? "普通" : todo.Priority,
                 IsDone = todo.IsDone
             })
             .ToList();

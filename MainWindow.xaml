@@ -18,11 +18,14 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -37,6 +40,7 @@
 
     <Grid x:Name="Root" Background="Transparent" MouseLeftButtonDown="Root_MouseLeftButtonDown">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -59,6 +63,24 @@
         </DockPanel>
 
         <UniformGrid x:Name="WeekHeaderGrid" Grid.Row="1" Columns="7" Margin="12,0,12,4"/>
-        <UniformGrid x:Name="CalendarGrid" Grid.Row="2" Columns="7" Rows="6" Margin="12,0,12,12"/>
+
+        <Border x:Name="TodayTodoPanel"
+                Grid.Row="2"
+                Margin="12,0,12,8"
+                Padding="8,6"
+                CornerRadius="6"
+                Background="#18181818"
+                Visibility="Collapsed">
+            <DockPanel LastChildFill="True">
+                <TextBlock x:Name="TodayTodoTitle"
+                           Text="今日待办"
+                           Margin="0,0,10,0"
+                           VerticalAlignment="Center"
+                           FontWeight="Normal"/>
+                <WrapPanel x:Name="TodayTodoItems"/>
+            </DockPanel>
+        </Border>
+
+        <UniformGrid x:Name="CalendarGrid" Grid.Row="3" Columns="7" Rows="6" Margin="12,0,12,12"/>
     </Grid>
 </Window>

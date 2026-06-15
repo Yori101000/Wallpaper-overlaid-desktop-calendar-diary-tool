@@ -11,5 +11,6 @@ public sealed class CalendarEntry
 public sealed class TodoItem
 {
     public string Text { get; set; } = string.Empty;
+    public string Priority { get; set; } = "普通";
     public bool IsDone { get; set; }
 }
