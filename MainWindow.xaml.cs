@@ -1,12 +1,14 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using TransparentCalendar.Models;
-using TransparentCalendar.Native;
 using TransparentCalendar.Services;
 using TransparentCalendar.Views;
 using Drawing = System.Drawing;
@@ -24,6 +26,17 @@ namespace TransparentCalendar;
 
 public partial class MainWindow : Window
 {
+    private const int GwlExStyle = -20;
+    private const int WsExAppWindow = 0x00040000;
+    private const int WsExToolWindow = 0x00000080;
+    private const int SwpNoSize = 0x0001;
+    private const int SwpNoMove = 0x0002;
+    private const int SwpNoZOrder = 0x0004;
+    private const int SwpNoActivate = 0x0010;
+    private const int SwpFrameChanged = 0x0020;
+    private const string SidebarPositionRight = "Right";
+    private const double SidebarWidth = 68;
+
     private static readonly SolidColorBrush TodoMarkerBrush = new(WpfColor.FromRgb(255, 209, 102));
     private static readonly SolidColorBrush DiaryMarkerBrush = new(WpfColor.FromRgb(123, 223, 242));
     private static readonly SolidColorBrush ImportantBadgeBrush = new(WpfColor.FromRgb(239, 71, 111));
@@ -35,6 +48,7 @@ public partial class MainWindow : Window
     private AppSettings _settings;
     private DateTime _visibleMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private bool _isExitRequested;
+    private bool _isListMode;
 
     public MainWindow()
     {
@@ -47,10 +61,17 @@ public partial class MainWindow : Window
         ApplySettings();
         RenderCalendar();
 
-        SourceInitialized += (_, _) => AttachToDesktopLayerIfEnabled();
+        SourceInitialized += (_, _) =>
+        {
+            HideMainWindowFromFastSwitcher();
+            ApplyDesktopLayerSetting();
+        };
         Loaded += (_, _) => ApplyStartupVisibility();
         Closing += MainWindow_Closing;
-        Closed += (_, _) => DisposeTrayIcon();
+        Closed += (_, _) =>
+        {
+            DisposeTrayIcon();
+        };
     }
 
     private void ApplySettings()
@@ -64,11 +85,15 @@ public partial class MainWindow : Window
         Topmost = _settings.KeepOnTop;
 
         var brush = ParseBrush(_settings.TextColor, _settings.TextOpacity);
-        Root.Opacity = _settings.TextOpacity;
+        Root.Opacity = 1;
         MonthTitle.Foreground = brush;
         MonthTitle.FontSize = _settings.FontSize * 0.95;
+        MonthTitle.Effect = CreateTextShadow(_settings.TextOpacity);
         TodayTodoTitle.Foreground = brush;
         TodayTodoTitle.FontSize = Math.Max(12, _settings.FontSize * 0.45);
+        TodayTodoTitle.Effect = CreateTextShadow(_settings.TextOpacity);
+        ApplySidebarPosition();
+        UpdateModeButtons();
         RenderWeekHeader();
     }
 
@@ -101,7 +126,8 @@ public partial class MainWindow : Window
                 FontSize = Math.Max(12, _settings.FontSize * 0.45),
                 HorizontalAlignment = WpfHorizontalAlignment.Center,
                 VerticalAlignment = WpfVerticalAlignment.Center,
-                FontWeight = FontWeights.Light
+                FontWeight = FontWeights.Light,
+                Effect = CreateTextShadow(_settings.TextOpacity * 0.7)
             });
         }
     }
@@ -122,6 +148,7 @@ public partial class MainWindow : Window
         }
 
         RenderTodayTodos();
+        RenderListView();
     }
 
     private WpfButton CreateDayButton(DateTime date)
@@ -184,7 +211,8 @@ public partial class MainWindow : Window
             FontWeight = date.Date == DateTime.Today ? FontWeights.Normal : FontWeights.Light,
             Foreground = foreground,
             HorizontalAlignment = WpfHorizontalAlignment.Center,
-            VerticalAlignment = WpfVerticalAlignment.Center
+            VerticalAlignment = WpfVerticalAlignment.Center,
+            Effect = CreateTextShadow(opacity)
         });
 
         if (hasTodos || hasDiary)
@@ -297,11 +325,12 @@ public partial class MainWindow : Window
             var isImportant = IsImportantTodo(todo);
             TodayTodoItems.Children.Add(new TextBlock
             {
-                Text = isImportant ? $"重要：{todo.Text.Trim()}" : todo.Text.Trim(),
+                Text = BuildTodayTodoText(todo, isImportant),
                 Foreground = isImportant ? ImportantBadgeBrush : ParseBrush(_settings.TextColor, _settings.TextOpacity),
                 FontSize = Math.Max(12, _settings.FontSize * 0.45),
                 Margin = new Thickness(0, 0, 12, 2),
-                VerticalAlignment = WpfVerticalAlignment.Center
+                VerticalAlignment = WpfVerticalAlignment.Center,
+                Effect = CreateTextShadow(_settings.TextOpacity * 0.7)
             });
         }
 
@@ -313,7 +342,8 @@ public partial class MainWindow : Window
                 Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.8),
                 FontSize = Math.Max(12, _settings.FontSize * 0.45),
                 Margin = new Thickness(0, 0, 12, 2),
-                VerticalAlignment = WpfVerticalAlignment.Center
+                VerticalAlignment = WpfVerticalAlignment.Center,
+                Effect = CreateTextShadow(_settings.TextOpacity * 0.7)
             });
         }
     }
@@ -331,6 +361,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        OpenDayEditor(date);
+    }
+
+    private void OpenDayEditor(DateTime date)
+    {
         var key = DateKey(date);
         if (!_entries.TryGetValue(key, out var entry))
         {
@@ -338,7 +373,7 @@ public partial class MainWindow : Window
             _entries[key] = entry;
         }
 
-        var editor = new DayEditorWindow(date, entry)
+        var editor = new DayEditorWindow(date, entry, PostponeTodoToDate)
         {
             Owner = this
         };
@@ -363,6 +398,263 @@ public partial class MainWindow : Window
         RenderCalendar();
     }
 
+    private void CalendarMode_Click(object sender, RoutedEventArgs e)
+    {
+        SetListMode(false);
+    }
+
+    private void ListMode_Click(object sender, RoutedEventArgs e)
+    {
+        SetListMode(true);
+    }
+
+    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
+        {
+            SetListMode(true);
+            return;
+        }
+
+        RenderListView();
+    }
+
+    private void SetListMode(bool isListMode)
+    {
+        _isListMode = isListMode;
+        CalendarViewPanel.Visibility = _isListMode ? Visibility.Collapsed : Visibility.Visible;
+        ListViewPanel.Visibility = _isListMode ? Visibility.Visible : Visibility.Collapsed;
+        UpdateModeButtons();
+        RenderListView();
+    }
+
+    private void ApplySidebarPosition()
+    {
+        var isRight = string.Equals(_settings.SidebarPosition, SidebarPositionRight, StringComparison.Ordinal);
+        LeftSidebarColumn.Width = isRight ? new GridLength(0) : new GridLength(SidebarWidth);
+        RightSidebarColumn.Width = isRight ? new GridLength(SidebarWidth) : new GridLength(0);
+        Grid.SetColumn(ModeSidebar, isRight ? 2 : 0);
+        ModeSidebar.Margin = isRight ? new Thickness(10, 0, 0, 0) : new Thickness(0, 0, 10, 0);
+    }
+
+    private void UpdateModeButtons()
+    {
+        SetModeButtonSelected(CalendarModeButton, !_isListMode);
+        SetModeButtonSelected(ListModeButton, _isListMode);
+    }
+
+    private static void SetModeButtonSelected(WpfButton button, bool isSelected)
+    {
+        button.Opacity = isSelected ? 1 : 0.72;
+        button.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal;
+        button.Background = new SolidColorBrush(WpfColor.FromArgb(isSelected ? (byte)70 : (byte)24, 255, 255, 255));
+        button.BorderBrush = new SolidColorBrush(WpfColor.FromArgb(isSelected ? (byte)95 : (byte)42, 255, 255, 255));
+    }
+
+    private void RenderListView()
+    {
+        if (ListContentPanel is null)
+        {
+            return;
+        }
+
+        ListContentPanel.Children.Clear();
+        var searchText = SearchTextBox?.Text.Trim() ?? string.Empty;
+
+        AddUnfinishedTodoSection(searchText);
+        AddMonthRecordSection(searchText);
+        AddRecentRecordSection(searchText);
+    }
+
+    private void AddUnfinishedTodoSection(string searchText)
+    {
+        AddListSectionTitle("未完成待办");
+        var items = _entries
+            .SelectMany(entry => entry.Value.Todos
+                .Where(todo => !todo.IsDone && !string.IsNullOrWhiteSpace(todo.Text))
+                .Select(todo => new { Date = ParseDateKey(entry.Key), Todo = todo }))
+            .Where(item => item.Date is not null && TodoMatchesSearch(item.Todo, searchText))
+            .OrderBy(item => item.Date)
+            .Take(30)
+            .ToList();
+
+        if (items.Count == 0)
+        {
+            AddListEmptyText("没有未完成待办。");
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var date = item.Date!.Value;
+            AddListButton(
+                date,
+                date.ToString("yyyy-MM-dd dddd", CultureInfo.GetCultureInfo("zh-CN")),
+                BuildTodoSummary(item.Todo),
+                IsImportantTodo(item.Todo) ? ImportantBadgeBrush : TodoBadgeBrush);
+        }
+    }
+
+    private void AddMonthRecordSection(string searchText)
+    {
+        AddListSectionTitle("本月记录");
+        var items = _entries
+            .Select(entry => new { Date = ParseDateKey(entry.Key), Entry = entry.Value })
+            .Where(item => item.Date is not null
+                && item.Date.Value.Year == _visibleMonth.Year
+                && item.Date.Value.Month == _visibleMonth.Month
+                && EntryHasContent(item.Entry)
+                && EntryMatchesSearch(item.Entry, searchText))
+            .OrderBy(item => item.Date)
+            .ToList();
+
+        if (items.Count == 0)
+        {
+            AddListEmptyText("本月没有记录。");
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var date = item.Date!.Value;
+            AddListButton(
+                date,
+                date.ToString("M 月 d 日 dddd", CultureInfo.GetCultureInfo("zh-CN")),
+                BuildEntrySummary(item.Entry),
+                DiaryMarkerBrush);
+        }
+    }
+
+    private void AddRecentRecordSection(string searchText)
+    {
+        AddListSectionTitle("最近更新");
+        var items = _entries
+            .Select(entry => new { Date = ParseDateKey(entry.Key), Entry = entry.Value })
+            .Where(item => item.Date is not null && EntryHasContent(item.Entry) && EntryMatchesSearch(item.Entry, searchText))
+            .OrderByDescending(item => item.Entry.UpdatedAt)
+            .Take(12)
+            .ToList();
+
+        if (items.Count == 0)
+        {
+            AddListEmptyText("没有最近记录。");
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var date = item.Date!.Value;
+            AddListButton(
+                date,
+                $"{date:yyyy-MM-dd}  更新于 {item.Entry.UpdatedAt:MM-dd HH:mm}",
+                BuildEntrySummary(item.Entry),
+                TodoMarkerBrush);
+        }
+    }
+
+    private void AddListSectionTitle(string text)
+    {
+        ListContentPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity),
+            FontSize = Math.Max(14, _settings.FontSize * 0.52),
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 4, 0, 6),
+            Effect = CreateTextShadow(_settings.TextOpacity)
+        });
+    }
+
+    private void AddListEmptyText(string text)
+    {
+        ListContentPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.55),
+            FontSize = Math.Max(12, _settings.FontSize * 0.42),
+            Margin = new Thickness(0, 0, 0, 10),
+            Effect = CreateTextShadow(_settings.TextOpacity * 0.6)
+        });
+    }
+
+    private void AddListButton(DateTime date, string title, string detail, WpfBrush accent)
+    {
+        var titleText = new TextBlock
+        {
+            Text = title,
+            Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity),
+            FontWeight = FontWeights.SemiBold,
+            FontSize = Math.Max(13, _settings.FontSize * 0.48),
+            Effect = CreateTextShadow(_settings.TextOpacity)
+        };
+
+        var detailText = new TextBlock
+        {
+            Text = detail,
+            Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.72),
+            FontSize = Math.Max(12, _settings.FontSize * 0.4),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 3, 0, 0),
+            Effect = CreateTextShadow(_settings.TextOpacity * 0.65)
+        };
+
+        var content = new DockPanel { LastChildFill = true };
+        var accentBar = new Border
+        {
+            Background = accent,
+            Width = 4,
+            CornerRadius = new CornerRadius(2),
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        DockPanel.SetDock(accentBar, Dock.Left);
+        content.Children.Add(accentBar);
+        content.Children.Add(new StackPanel
+        {
+            Children =
+            {
+                titleText,
+                detailText
+            }
+        });
+
+        var button = new WpfButton
+        {
+            Tag = date,
+            Content = content,
+            HorizontalContentAlignment = WpfHorizontalAlignment.Stretch,
+            Padding = new Thickness(8),
+            Margin = new Thickness(0, 0, 0, 6),
+            Background = new SolidColorBrush(WpfColor.FromArgb(18, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(WpfColor.FromArgb(36, 255, 255, 255)),
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+        button.Click += ListDate_Click;
+        ListContentPanel.Children.Add(button);
+    }
+
+    private void ListDate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: DateTime date })
+        {
+            OpenDayEditor(date);
+        }
+    }
+
+    private void PostponeTodoToDate(DateTime targetDate, TodoItem todo)
+    {
+        var targetKey = DateKey(targetDate);
+        if (!_entries.TryGetValue(targetKey, out var targetEntry))
+        {
+            targetEntry = new CalendarEntry { Date = targetKey };
+            _entries[targetKey] = targetEntry;
+        }
+
+        targetEntry.Todos.Add(todo);
+        targetEntry.UpdatedAt = DateTime.Now;
+        _storage.SaveEntries(_entries);
+        RenderCalendar();
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         OpenSettings();
@@ -381,11 +673,16 @@ public partial class MainWindow : Window
 
     private void Root_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_settings.IsLocked || e.ChangedButton != MouseButton.Left)
+        if (_settings.IsLocked || e.ChangedButton != MouseButton.Left || IsInteractiveDragSource(e.OriginalSource))
         {
             return;
         }
 
+        TryDragMove();
+    }
+
+    private void TryDragMove()
+    {
         try
         {
             DragMove();
@@ -394,6 +691,27 @@ public partial class MainWindow : Window
         {
             // DragMove can throw when the pointer is released during startup or modal transitions.
         }
+    }
+
+    private static bool IsInteractiveDragSource(object source)
+    {
+        var current = source as DependencyObject;
+        while (current is not null)
+        {
+            if (current is WpfButton
+                or System.Windows.Controls.TextBox
+                or System.Windows.Controls.CheckBox
+                or System.Windows.Controls.ComboBox
+                or System.Windows.Controls.Primitives.ScrollBar
+                or Slider)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -435,7 +753,7 @@ public partial class MainWindow : Window
 
             ApplySettings();
             RenderCalendar();
-            AttachToDesktopLayerIfEnabled();
+            ApplyDesktopLayerSetting();
         }
     }
 
@@ -472,12 +790,34 @@ public partial class MainWindow : Window
         Topmost = false;
     }
 
-    private void AttachToDesktopLayerIfEnabled()
+    private void ApplyDesktopLayerSetting()
     {
-        if (_settings.AttachToDesktopLayer)
+        // Wallpaper Engine owns the desktop wallpaper layer. Do not SetParent this
+        // window to WorkerW/Progman; keep it as a normal transparent overlay window.
+        HideMainWindowFromFastSwitcher();
+        Topmost = _settings.KeepOnTop;
+    }
+
+    private void HideMainWindowFromFastSwitcher()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
         {
-            DesktopWindowService.AttachToDesktop(this);
+            return;
         }
+
+        var style = GetWindowLongPtrSafe(hwnd, GwlExStyle).ToInt64();
+        style &= ~WsExAppWindow;
+        style |= WsExToolWindow;
+        SetWindowLongPtrSafe(hwnd, GwlExStyle, new IntPtr(style));
+        SetWindowPos(
+            hwnd,
+            IntPtr.Zero,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
     }
 
     private void InitializeTrayIcon()
@@ -519,6 +859,7 @@ public partial class MainWindow : Window
     private void ShowWindowFromTray()
     {
         Show();
+        HideMainWindowFromFastSwitcher();
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
@@ -568,6 +909,81 @@ public partial class MainWindow : Window
         return string.Equals(todo.Priority, "重要", StringComparison.Ordinal);
     }
 
+    private static DateTime? ParseDateKey(string key)
+    {
+        return DateTime.TryParseExact(
+            key,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var date)
+            ? date
+            : null;
+    }
+
+    private static bool EntryHasContent(CalendarEntry entry)
+    {
+        return entry.Todos.Any(todo => !string.IsNullOrWhiteSpace(todo.Text))
+            || !string.IsNullOrWhiteSpace(entry.Diary);
+    }
+
+    private static bool EntryMatchesSearch(CalendarEntry entry, string searchText)
+    {
+        return string.IsNullOrWhiteSpace(searchText)
+            || (!string.IsNullOrWhiteSpace(entry.Diary)
+                && entry.Diary.Contains(searchText, StringComparison.CurrentCultureIgnoreCase))
+            || entry.Todos.Any(todo => TodoMatchesSearch(todo, searchText));
+    }
+
+    private static bool TodoMatchesSearch(TodoItem todo, string searchText)
+    {
+        return string.IsNullOrWhiteSpace(searchText)
+            || todo.Text.Contains(searchText, StringComparison.CurrentCultureIgnoreCase)
+            || todo.Priority.Contains(searchText, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static string BuildTodoSummary(TodoItem todo)
+    {
+        var priority = IsImportantTodo(todo) ? "重要" : "普通";
+        var postponed = string.IsNullOrWhiteSpace(todo.PostponedLabel) ? string.Empty : $" · {todo.PostponedLabel}";
+        return $"{priority} · {todo.Text.Trim()}{postponed}";
+    }
+
+    private static string BuildEntrySummary(CalendarEntry entry)
+    {
+        var todoCount = entry.Todos.Count(todo => !string.IsNullOrWhiteSpace(todo.Text));
+        var unfinishedCount = entry.Todos.Count(todo => !todo.IsDone && !string.IsNullOrWhiteSpace(todo.Text));
+        var parts = new List<string>();
+        if (todoCount > 0)
+        {
+            parts.Add($"待办 {todoCount} 项，未完成 {unfinishedCount} 项");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.Diary))
+        {
+            parts.Add($"日记：{PreviewText(entry.Diary)}");
+        }
+
+        return parts.Count == 0 ? "无内容" : string.Join("；", parts);
+    }
+
+    private static string PreviewText(string text)
+    {
+        var normalized = string.Join(
+            " ",
+            text.Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= 42 ? normalized : $"{normalized[..42]}...";
+    }
+
+    private static string BuildTodayTodoText(TodoItem todo, bool isImportant)
+    {
+        var prefix = isImportant ? "重要：" : string.Empty;
+        var postponed = string.IsNullOrWhiteSpace(todo.PostponedLabel) ? string.Empty : $"（{todo.PostponedLabel}）";
+        return $"{prefix}{todo.Text.Trim()}{postponed}";
+    }
+
     private static string DateKey(DateTime date)
     {
         return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -586,4 +1002,51 @@ public partial class MainWindow : Window
             return new SolidColorBrush(WpfColor.FromArgb((byte)Math.Clamp(opacity * 255, 0, 255), 255, 255, 255));
         }
     }
+
+    private static DropShadowEffect CreateTextShadow(double opacity)
+    {
+        return new DropShadowEffect
+        {
+            Color = System.Windows.Media.Colors.Black,
+            BlurRadius = 5,
+            ShadowDepth = 0,
+            Opacity = Math.Clamp(opacity * 0.65, 0.2, 0.65)
+        };
+    }
+
+    private static IntPtr GetWindowLongPtrSafe(IntPtr hWnd, int nIndex)
+    {
+        return IntPtr.Size == 8
+            ? GetWindowLongPtr(hWnd, nIndex)
+            : new IntPtr(GetWindowLong(hWnd, nIndex));
+    }
+
+    private static IntPtr SetWindowLongPtrSafe(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        return IntPtr.Size == 8
+            ? SetWindowLongPtr(hWnd, nIndex, dwNewLong)
+            : new IntPtr(SetWindowLong(hWnd, nIndex, dwNewLong.ToInt32()));
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        int uFlags);
 }

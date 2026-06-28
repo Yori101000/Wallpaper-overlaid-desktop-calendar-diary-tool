@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TransparentCalendar.Models;
 
 public sealed class CalendarEntry
@@ -12,5 +14,10 @@ public sealed class TodoItem
 {
     public string Text { get; set; } = string.Empty;
     public string Priority { get; set; } = "普通";
+    public string PostponedFromDate { get; set; } = string.Empty;
+    public int PostponedDays { get; set; }
     public bool IsDone { get; set; }
+
+    [JsonIgnore]
+    public string PostponedLabel => PostponedDays > 0 ? $"已推迟 {PostponedDays} 天" : string.Empty;
 }

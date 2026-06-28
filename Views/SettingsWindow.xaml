@@ -3,12 +3,22 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="透明日历设置"
         Width="430"
-        Height="540"
+        Height="630"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#F21A1A1A">
-    <Grid Margin="18">
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+    <Border Margin="8"
+            Padding="18"
+            CornerRadius="10"
+            Background="#CC1A1A1A"
+            BorderBrush="#55FFFFFF"
+            BorderThickness="1">
+    <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -20,7 +30,18 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="透明日历设置" FontSize="22" FontWeight="Light" Foreground="White" Margin="0,0,0,16"/>
+        <DockPanel Margin="0,0,0,16" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Button Content="×"
+                    Width="30"
+                    Height="30"
+                    DockPanel.Dock="Right"
+                    Click="Cancel_Click"/>
+            <TextBlock Text="透明日历设置"
+                       FontSize="22"
+                       FontWeight="Light"
+                       Foreground="White"
+                       VerticalAlignment="Center"/>
+        </DockPanel>
 
         <DockPanel Grid.Row="1" Margin="0,0,0,12">
             <TextBlock Text="文字透明度" Width="92" Foreground="White" VerticalAlignment="Center"/>
@@ -35,41 +56,62 @@
         </DockPanel>
 
         <DockPanel Grid.Row="3" Margin="0,0,0,12">
+            <TextBlock Text="主题预设" Width="92" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox x:Name="ThemePresetCombo"
+                      SelectionChanged="ThemePresetCombo_SelectionChanged">
+                <ComboBoxItem Content="自定义"/>
+                <ComboBoxItem Content="清晰白"/>
+                <ComboBoxItem Content="柔和青"/>
+                <ComboBoxItem Content="暖金"/>
+                <ComboBoxItem Content="高对比"/>
+            </ComboBox>
+        </DockPanel>
+
+        <DockPanel Grid.Row="4" Margin="0,0,0,12">
             <TextBlock Text="文字颜色" Width="92" Foreground="White" VerticalAlignment="Center"/>
             <TextBox x:Name="ColorText" Text="#FFFFFFFF"/>
         </DockPanel>
 
-        <StackPanel Grid.Row="4" Margin="0,0,0,12">
+        <DockPanel Grid.Row="5" Margin="0,0,0,12">
+            <TextBlock Text="侧边栏位置" Width="92" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox x:Name="SidebarPositionCombo">
+                <ComboBoxItem Content="左侧"/>
+                <ComboBoxItem Content="右侧"/>
+            </ComboBox>
+        </DockPanel>
+
+        <StackPanel Grid.Row="6" Margin="0,0,0,12">
             <CheckBox x:Name="LockWindowCheck" Content="锁定位置和大小" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="MondayStartCheck" Content="周一作为一周开始" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="TopmostCheck" Content="始终显示在窗口上方" Foreground="White" Margin="0,0,0,8"/>
-            <CheckBox x:Name="DesktopLayerCheck" Content="贴到桌面壁纸层" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="DesktopLayerCheck" Content="显示在桌面壁纸上方" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="BootCheck" Content="开机自动启动" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="CloseToTrayCheck" Content="关闭后进入后台" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="StartInTrayCheck" Content="启动后进入后台" Foreground="White"/>
         </StackPanel>
 
-        <Button Grid.Row="5"
+        <Button Grid.Row="7"
                 Content="打开本地存储位置"
                 HorizontalAlignment="Left"
                 Padding="12,6"
                 Margin="0,0,0,12"
                 Click="OpenStorage_Click"/>
 
-        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,0,0,12">
+        <StackPanel Grid.Row="8" Orientation="Horizontal" Margin="0,0,0,12">
             <Button Content="导出备份" Padding="12,6" Margin="0,0,8,0" Click="ExportBackup_Click"/>
             <Button Content="导入备份" Padding="12,6" Click="ImportBackup_Click"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="7"
+        <TextBlock Grid.Row="9"
                    x:Name="StoragePathText"
                    TextWrapping="Wrap"
                    Foreground="#CCFFFFFF"
                    FontSize="12"/>
 
-        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="取消" Width="76" Margin="0,0,8,0" Click="Cancel_Click"/>
             <Button Content="保存" Width="76" Click="Save_Click"/>
         </StackPanel>
     </Grid>
+    </Border>
 </Window>

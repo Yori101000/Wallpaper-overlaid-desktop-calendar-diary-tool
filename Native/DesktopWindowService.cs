@@ -10,38 +10,14 @@ public static class DesktopWindowService
 
     public static bool AttachToDesktop(Window window)
     {
-        try
-        {
-            var hwnd = new WindowInteropHelper(window).Handle;
-            if (hwnd == IntPtr.Zero)
-            {
-                return false;
-            }
+        // Intentionally disabled. Parenting to WorkerW/Progman can put the calendar
+        // behind Wallpaper Engine, making it appear invisible.
+        return false;
+    }
 
-            var progman = FindWindow("Progman", null);
-            if (progman != IntPtr.Zero)
-            {
-                SendMessageTimeout(progman, WmSpawnWorker, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
-            }
-
-            var worker = FindDesktopWorker();
-            if (worker == IntPtr.Zero)
-            {
-                worker = progman;
-            }
-
-            if (worker == IntPtr.Zero)
-            {
-                return false;
-            }
-
-            SetParent(hwnd, worker);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+    public static bool DetachFromDesktop(Window window)
+    {
+        return true;
     }
 
     private static IntPtr FindDesktopWorker()

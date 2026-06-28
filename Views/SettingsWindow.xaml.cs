@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Input;
 using Microsoft.Win32;
 using TransparentCalendar.Models;
 using TransparentCalendar.Services;
@@ -10,9 +11,21 @@ namespace TransparentCalendar.Views;
 
 public partial class SettingsWindow : Window
 {
+    private const string SidebarPositionLeft = "Left";
+    private const string SidebarPositionRight = "Right";
+
+    private static readonly Dictionary<string, string> ThemeTextColors = new(StringComparer.Ordinal)
+    {
+        ["清晰白"] = "#FFFFFFFF",
+        ["柔和青"] = "#FF7BDFF2",
+        ["暖金"] = "#FFFFD166",
+        ["高对比"] = "#FFFFFFFF"
+    };
+
     private readonly StorageService _storage;
     private readonly StartupService _startup = new();
     private readonly Dictionary<string, CalendarEntry> _entries;
+    private bool _isApplyingSettingsToControls;
 
     public AppSettings Settings { get; private set; }
     public bool DataImported { get; private set; }
@@ -30,6 +43,8 @@ public partial class SettingsWindow : Window
             Height = settings.Height,
             TextOpacity = settings.TextOpacity,
             FontSize = settings.FontSize,
+            ThemePreset = settings.ThemePreset,
+            SidebarPosition = settings.SidebarPosition,
             TextColor = settings.TextColor,
             IsLocked = settings.IsLocked,
             StartWithMonday = settings.StartWithMonday,
@@ -40,18 +55,8 @@ public partial class SettingsWindow : Window
             StartOnBoot = _startup.IsEnabled()
         };
 
-        OpacitySlider.Value = Settings.TextOpacity;
-        FontSizeSlider.Value = Settings.FontSize;
-        ColorText.Text = Settings.TextColor;
-        LockWindowCheck.IsChecked = Settings.IsLocked;
-        MondayStartCheck.IsChecked = Settings.StartWithMonday;
-        TopmostCheck.IsChecked = Settings.KeepOnTop;
-        DesktopLayerCheck.IsChecked = Settings.AttachToDesktopLayer;
-        BootCheck.IsChecked = Settings.StartOnBoot;
-        CloseToTrayCheck.IsChecked = Settings.CloseToTray;
-        StartInTrayCheck.IsChecked = Settings.StartInTray;
+        ApplySettingsToControls();
         StoragePathText.Text = _storage.AppDataDirectory;
-        UpdateSliderLabels();
     }
 
     private void OpenStorage_Click(object sender, RoutedEventArgs e)
@@ -64,10 +69,30 @@ public partial class SettingsWindow : Window
         });
     }
 
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left
+            || e.OriginalSource is System.Windows.Controls.Button)
+        {
+            return;
+        }
+
+        try
+        {
+            DragMove();
+        }
+        catch
+        {
+            // 拖动过程中释放鼠标可能抛出异常，不影响窗口状态。
+        }
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         Settings.TextOpacity = OpacitySlider.Value;
         Settings.FontSize = FontSizeSlider.Value;
+        Settings.ThemePreset = GetSelectedThemePreset();
+        Settings.SidebarPosition = GetSelectedSidebarPosition();
         Settings.TextColor = string.IsNullOrWhiteSpace(ColorText.Text) ? "#FFFFFFFF" : ColorText.Text.Trim();
         Settings.IsLocked = LockWindowCheck.IsChecked == true;
         Settings.StartWithMonday = MondayStartCheck.IsChecked == true;
@@ -154,6 +179,20 @@ public partial class SettingsWindow : Window
         UpdateSliderLabels();
     }
 
+    private void ThemePresetCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_isApplyingSettingsToControls)
+        {
+            return;
+        }
+
+        var selectedPreset = GetSelectedThemePreset();
+        if (ThemeTextColors.TryGetValue(selectedPreset, out var textColor))
+        {
+            ColorText.Text = textColor;
+        }
+    }
+
     private void UpdateSliderLabels()
     {
         if (OpacityValue is null || FontSizeValue is null)
@@ -167,16 +206,77 @@ public partial class SettingsWindow : Window
 
     private void ApplySettingsToControls()
     {
-        OpacitySlider.Value = Settings.TextOpacity;
-        FontSizeSlider.Value = Settings.FontSize;
-        ColorText.Text = Settings.TextColor;
-        LockWindowCheck.IsChecked = Settings.IsLocked;
-        MondayStartCheck.IsChecked = Settings.StartWithMonday;
-        TopmostCheck.IsChecked = Settings.KeepOnTop;
-        DesktopLayerCheck.IsChecked = Settings.AttachToDesktopLayer;
-        BootCheck.IsChecked = Settings.StartOnBoot;
-        CloseToTrayCheck.IsChecked = Settings.CloseToTray;
-        StartInTrayCheck.IsChecked = Settings.StartInTray;
-        UpdateSliderLabels();
+        _isApplyingSettingsToControls = true;
+        try
+        {
+            OpacitySlider.Value = Settings.TextOpacity;
+            FontSizeSlider.Value = Settings.FontSize;
+            ColorText.Text = Settings.TextColor;
+            SelectThemePreset(Settings.ThemePreset, Settings.TextColor);
+            SelectSidebarPosition(Settings.SidebarPosition);
+            LockWindowCheck.IsChecked = Settings.IsLocked;
+            MondayStartCheck.IsChecked = Settings.StartWithMonday;
+            TopmostCheck.IsChecked = Settings.KeepOnTop;
+            DesktopLayerCheck.IsChecked = Settings.AttachToDesktopLayer;
+            BootCheck.IsChecked = Settings.StartOnBoot;
+            CloseToTrayCheck.IsChecked = Settings.CloseToTray;
+            StartInTrayCheck.IsChecked = Settings.StartInTray;
+            UpdateSliderLabels();
+        }
+        finally
+        {
+            _isApplyingSettingsToControls = false;
+        }
+    }
+
+    private void SelectThemePreset(string preset, string textColor)
+    {
+        var selectedPreset = ThemeTextColors.TryGetValue(preset, out var presetColor)
+            && string.Equals(presetColor, textColor, StringComparison.OrdinalIgnoreCase)
+            ? preset
+            : "自定义";
+
+        foreach (var item in ThemePresetCombo.Items.OfType<System.Windows.Controls.ComboBoxItem>())
+        {
+            if (string.Equals(item.Content?.ToString(), selectedPreset, StringComparison.Ordinal))
+            {
+                ThemePresetCombo.SelectedItem = item;
+                return;
+            }
+        }
+    }
+
+    private string GetSelectedThemePreset()
+    {
+        return ThemePresetCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item
+            ? item.Content?.ToString() ?? "自定义"
+            : "自定义";
+    }
+
+    private void SelectSidebarPosition(string position)
+    {
+        var selectedText = string.Equals(position, SidebarPositionRight, StringComparison.Ordinal)
+            ? "右侧"
+            : "左侧";
+
+        foreach (var item in SidebarPositionCombo.Items.OfType<System.Windows.Controls.ComboBoxItem>())
+        {
+            if (string.Equals(item.Content?.ToString(), selectedText, StringComparison.Ordinal))
+            {
+                SidebarPositionCombo.SelectedItem = item;
+                return;
+            }
+        }
+    }
+
+    private string GetSelectedSidebarPosition()
+    {
+        if (SidebarPositionCombo.SelectedItem is System.Windows.Controls.ComboBoxItem item
+            && string.Equals(item.Content?.ToString(), "右侧", StringComparison.Ordinal))
+        {
+            return SidebarPositionRight;
+        }
+
+        return SidebarPositionLeft;
     }
 }

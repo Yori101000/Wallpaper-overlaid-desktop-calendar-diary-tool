@@ -5,9 +5,17 @@
         Width="420"
         Height="520"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize"
-        Background="#F21A1A1A">
-    <Grid Margin="18">
+        ResizeMode="CanResizeWithGrip"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+    <Border Margin="8"
+            Padding="18"
+            CornerRadius="10"
+            Background="#CC1A1A1A"
+            BorderBrush="#55FFFFFF"
+            BorderThickness="1">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -15,11 +23,18 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="DateTitle"
-                   FontSize="22"
-                   Foreground="White"
-                   FontWeight="Light"
-                   Margin="0,0,0,16"/>
+        <DockPanel Margin="0,0,0,16" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Button Content="×"
+                    Width="30"
+                    Height="30"
+                    DockPanel.Dock="Right"
+                    Click="Cancel_Click"/>
+            <TextBlock x:Name="DateTitle"
+                       FontSize="22"
+                       Foreground="White"
+                       FontWeight="Light"
+                       VerticalAlignment="Center"/>
+        </DockPanel>
 
         <GroupBox Grid.Row="1" Header="待办" Foreground="White" BorderBrush="#40FFFFFF" Margin="0,0,0,14">
             <Grid Margin="8">
@@ -37,6 +52,22 @@
                                         DockPanel.Dock="Right"
                                         Margin="8,0,0,0"
                                         Click="DeleteTodo_Click"/>
+                                <Button Content="推迟"
+                                        Width="46"
+                                        DockPanel.Dock="Right"
+                                        Margin="8,0,0,0"
+                                        Click="PostponeTodo_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                                 <ComboBox Width="64"
                                           Margin="8,0,0,0"
                                           DockPanel.Dock="Right"
@@ -47,9 +78,25 @@
                                 </ComboBox>
                                 <CheckBox IsChecked="{Binding IsDone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="8,0,0,0"
-                                         MinWidth="240"/>
+                                <StackPanel Margin="8,0,0,0">
+                                    <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             MinWidth="180"/>
+                                    <TextBlock Text="{Binding PostponedLabel}"
+                                               Foreground="#CCFFD166"
+                                               FontSize="11"
+                                               Margin="0,2,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding PostponedLabel}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
                             </DockPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -80,4 +127,5 @@
             <Button Content="保存" Width="76" Click="Save_Click"/>
         </StackPanel>
     </Grid>
+    </Border>
 </Window>
