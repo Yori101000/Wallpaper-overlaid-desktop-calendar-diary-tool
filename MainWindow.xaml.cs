@@ -473,7 +473,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        RenderListView();
+        // 搜索清空：恢复到月历模式（搜索时自动切到列表，清空自然回退）
+        CalendarMode_Click(sender, new RoutedEventArgs());
     }
 
     private void SetListMode(bool isListMode)
