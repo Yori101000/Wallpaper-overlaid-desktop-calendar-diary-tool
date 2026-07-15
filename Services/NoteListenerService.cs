@@ -91,6 +91,7 @@ public sealed class NoteListenerService : IDisposable
                 var data = JsonSerializer.Deserialize<NoteRequest>(body, _jsonOptions);
                 if (data != null && !string.IsNullOrWhiteSpace(data.Url))
                 {
+                    data.Url = NormalizeUrl(data.Url);
                     var notes = _storage.LoadWebNotes();
                     var title = string.IsNullOrWhiteSpace(data.Title) ? ExtractDomain(data.Url) : data.Title;
                     var existing = notes.Find(n => n.Url == data.Url);
@@ -132,6 +133,19 @@ public sealed class NoteListenerService : IDisposable
             response.Close();
         }
         catch { }
+    }
+
+    private static string NormalizeUrl(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            return uri.Scheme + "://" + uri.Host + uri.AbsolutePath.TrimEnd('/');
+        }
+        catch
+        {
+            return url;
+        }
     }
 
     private static string ExtractDomain(string url)
