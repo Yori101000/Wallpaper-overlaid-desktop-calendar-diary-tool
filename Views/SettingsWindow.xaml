@@ -61,7 +61,7 @@
             <Slider x:Name="FontSizeSlider" Minimum="16" Maximum="56" TickFrequency="1" ValueChanged="FontSizeSlider_ValueChanged"/>
         </DockPanel>
 
-        <DockPanel Grid.Row="3" Margin="0,0,0,12">
+        <DockPanel Grid.Row="4" Margin="0,0,0,12">
             <TextBlock Text="主题预设" Width="92" Foreground="White" VerticalAlignment="Center"/>
             <ComboBox x:Name="ThemePresetCombo"
                       SelectionChanged="ThemePresetCombo_SelectionChanged">
