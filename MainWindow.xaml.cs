@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -47,8 +47,13 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? _trayIcon;
     private AppSettings _settings;
     private DateTime _visibleMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime _lastTodayDate = DateTime.Today;
     private bool _isExitRequested;
     private bool _isListMode;
+    private bool _isNoteMode;
+    private List<WebNoteGroup> _notes = [];
+    private WebNoteGroup? _editingNoteGroup;
+    private readonly NoteListenerService _noteListener;
 
     public MainWindow()
     {
@@ -56,10 +61,16 @@ public partial class MainWindow : Window
 
         _settings = _storage.LoadSettings();
         _entries = _storage.LoadEntries();
+        _notes = _storage.LoadWebNotes();
         InitializeTrayIcon();
         CreateStartupBackup();
         ApplySettings();
         RenderCalendar();
+        StartDailyRefreshTimer();
+
+        _noteListener = new NoteListenerService(_storage);
+        _noteListener.OnNoteReceived += () => Dispatcher.Invoke(() => { _notes = _storage.LoadWebNotes(); if (_isNoteMode) RenderWebNotes(); });
+        _noteListener.Start();
 
         SourceInitialized += (_, _) =>
         {
@@ -72,6 +83,21 @@ public partial class MainWindow : Window
         {
             DisposeTrayIcon();
         };
+    }
+
+    private void StartDailyRefreshTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer();
+        timer.Interval = TimeSpan.FromSeconds(60);
+        timer.Tick += (_, _) =>
+        {
+            if (DateTime.Today != _lastTodayDate)
+            {
+                _lastTodayDate = DateTime.Today;
+                RenderCalendar();
+            }
+        };
+        timer.Start();
     }
 
     private void ApplySettings()
@@ -92,6 +118,23 @@ public partial class MainWindow : Window
         TodayTodoTitle.Foreground = brush;
         TodayTodoTitle.FontSize = Math.Max(12, _settings.FontSize * 0.45);
         TodayTodoTitle.Effect = CreateTextShadow(_settings.TextOpacity);
+        // Apply background opacity to panels
+        var bgAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 255, 0, 255);
+        var navBrush = ParseBrush(_settings.TextColor, _settings.TextOpacity);
+        var bgColor = System.Windows.Media.Color.FromArgb(bgAlpha, 0x18, 0x18, 0x18);
+        ModeSidebar.Background = new System.Windows.Media.SolidColorBrush(bgColor);
+        MainContentPanel.Background = new System.Windows.Media.SolidColorBrush(bgColor);
+        HeaderBar.Background = new System.Windows.Media.SolidColorBrush(bgColor);
+
+        // Sync nav button foreground with text color
+        if (PrevMonthBtn is not null)
+        {
+            PrevMonthBtn.Foreground = navBrush;
+            NextMonthBtn.Foreground = navBrush;
+            SettingsBtn.Foreground = navBrush;
+            CloseBtn.Foreground = navBrush;
+        }
+
         ApplySidebarPosition();
         UpdateModeButtons();
         RenderWeekHeader();
@@ -137,6 +180,17 @@ public partial class MainWindow : Window
         MonthTitle.Text = _visibleMonth.ToString("yyyy 年 M 月", CultureInfo.GetCultureInfo("zh-CN"));
         MonthTitle.Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity);
         CalendarGrid.Children.Clear();
+        CalendarGrid.RowDefinitions.Clear();
+        CalendarGrid.ColumnDefinitions.Clear();
+
+        for (var col = 0; col < 7; col++)
+        {
+            CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        }
+        for (var row = 0; row < 6; row++)
+        {
+            CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        }
 
         var firstDayOffset = GetFirstDayOffset(_visibleMonth);
         var startDate = _visibleMonth.AddDays(-firstDayOffset);
@@ -144,7 +198,10 @@ public partial class MainWindow : Window
         for (var i = 0; i < 42; i++)
         {
             var date = startDate.AddDays(i);
-            CalendarGrid.Children.Add(CreateDayButton(date));
+            var button = CreateDayButton(date);
+            Grid.SetRow(button, i / 7);
+            Grid.SetColumn(button, i % 7);
+            CalendarGrid.Children.Add(button);
         }
 
         RenderTodayTodos();
@@ -191,7 +248,7 @@ public partial class MainWindow : Window
     {
         var opacity = isCurrentMonth ? _settings.TextOpacity : _settings.TextOpacity * 0.35;
         var foreground = ParseBrush(_settings.TextColor, opacity);
-        var content = new Grid { Margin = new Thickness(2) };
+        var content = new Grid { Margin = new Thickness(1) };
 
         if (date.Date == DateTime.Today)
         {
@@ -280,23 +337,7 @@ public partial class MainWindow : Window
 
     private static string BuildDayToolTip(DateTime date, bool hasTodos, bool hasDiary, int unfinishedCount)
     {
-        var parts = new List<string> { date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
-
-        if (unfinishedCount > 0)
-        {
-            parts.Add($"未完成待办：{unfinishedCount}");
-        }
-        else if (hasTodos)
-        {
-            parts.Add("待办已完成");
-        }
-
-        if (hasDiary)
-        {
-            parts.Add("有日记");
-        }
-
-        return string.Join(Environment.NewLine, parts);
+        return null;
     }
 
     private void RenderTodayTodos()
@@ -383,6 +424,7 @@ public partial class MainWindow : Window
             entry.UpdatedAt = DateTime.Now;
             _storage.SaveEntries(_entries);
             RenderCalendar();
+
         }
     }
 
@@ -390,17 +432,29 @@ public partial class MainWindow : Window
     {
         _visibleMonth = _visibleMonth.AddMonths(-1);
         RenderCalendar();
+
     }
 
     private void NextMonth_Click(object sender, RoutedEventArgs e)
     {
         _visibleMonth = _visibleMonth.AddMonths(1);
         RenderCalendar();
+
     }
 
     private void CalendarMode_Click(object sender, RoutedEventArgs e)
     {
-        SetListMode(false);
+        _isListMode = false;
+        _isNoteMode = false;
+        CalendarViewPanel.Visibility = Visibility.Visible;
+        ListViewPanel.Visibility = Visibility.Collapsed;
+        WebNoteViewPanel.Visibility = Visibility.Collapsed;
+        UpdateModeButtons();
+    }
+
+    private void NoteMode_Click(object sender, RoutedEventArgs e)
+    {
+        SetNoteMode(true);
     }
 
     private void ListMode_Click(object sender, RoutedEventArgs e)
@@ -422,10 +476,23 @@ public partial class MainWindow : Window
     private void SetListMode(bool isListMode)
     {
         _isListMode = isListMode;
+        if (isListMode) _isNoteMode = false;
         CalendarViewPanel.Visibility = _isListMode ? Visibility.Collapsed : Visibility.Visible;
         ListViewPanel.Visibility = _isListMode ? Visibility.Visible : Visibility.Collapsed;
+        WebNoteViewPanel.Visibility = Visibility.Collapsed;
         UpdateModeButtons();
         RenderListView();
+    }
+
+    private void SetNoteMode(bool isNoteMode)
+    {
+        _isNoteMode = isNoteMode;
+        if (isNoteMode) _isListMode = false;
+        CalendarViewPanel.Visibility = _isNoteMode ? Visibility.Collapsed : Visibility.Visible;
+        ListViewPanel.Visibility = Visibility.Collapsed;
+        WebNoteViewPanel.Visibility = _isNoteMode ? Visibility.Visible : Visibility.Collapsed;
+        UpdateModeButtons();
+        if (isNoteMode) RenderWebNotes();
     }
 
     private void ApplySidebarPosition()
@@ -439,8 +506,9 @@ public partial class MainWindow : Window
 
     private void UpdateModeButtons()
     {
-        SetModeButtonSelected(CalendarModeButton, !_isListMode);
+        SetModeButtonSelected(CalendarModeButton, !_isListMode && !_isNoteMode);
         SetModeButtonSelected(ListModeButton, _isListMode);
+        SetModeButtonSelected(NoteModeButton, _isNoteMode);
     }
 
     private static void SetModeButtonSelected(WpfButton button, bool isSelected)
@@ -653,6 +721,7 @@ public partial class MainWindow : Window
         targetEntry.UpdatedAt = DateTime.Now;
         _storage.SaveEntries(_entries);
         RenderCalendar();
+
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -753,6 +822,7 @@ public partial class MainWindow : Window
 
             ApplySettings();
             RenderCalendar();
+
             ApplyDesktopLayerSetting();
         }
     }
@@ -1028,6 +1098,221 @@ public partial class MainWindow : Window
             : new IntPtr(SetWindowLong(hWnd, nIndex, dwNewLong.ToInt32()));
     }
 
+    private void RenderWebNotes()
+    {
+        WebNoteListPanel.Children.Clear();
+        _notes = _storage.LoadWebNotes();
+
+        // Update bookmarklet code display
+        var port = _noteListener?.Port ?? 51999;
+        var code = $"javascript:(function(){{var t=window.getSelection()?.toString()||'';var u=location.href;var n=document.title;var x=new XMLHttpRequest();x.open('POST','http://localhost:{port}/save',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({{url:u,title:n,text:t}}));}})();";
+        BookmarkletText.Text = code;
+
+        if (_notes.Count == 0)
+        {
+            WebNoteListPanel.Children.Add(new TextBlock
+            {
+                Text = "暂无笔记，点击右侧 + 添加 添加网页笔记。",
+                Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.55),
+                FontSize = Math.Max(13, _settings.FontSize * 0.42),
+                Margin = new Thickness(0, 20, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            });
+            return;
+        }
+
+        foreach (var note in _notes.OrderByDescending(n => n.UpdatedAt))
+        {
+            var panel = new Border
+            {
+                Margin = new Thickness(0, 0, 0, 8),
+                Padding = new Thickness(10),
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(WpfColor.FromArgb(18, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(WpfColor.FromArgb(30, 255, 255, 255)),
+                BorderThickness = new Thickness(1)
+            };
+
+            var innerStack = new StackPanel();
+
+            var titleBtn = new WpfButton
+            {
+                Content = note.Title,
+                Tag = note,
+                HorizontalContentAlignment = WpfHorizontalAlignment.Left,
+                Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = Math.Max(14, _settings.FontSize * 0.48),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Background = WpfBrushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0)
+            };
+            titleBtn.Click += NoteTitle_Click;
+            innerStack.Children.Add(titleBtn);
+
+            if (!string.IsNullOrWhiteSpace(note.Url))
+            {
+                var urlText = new TextBlock
+                {
+                    Text = note.Url,
+                    Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.55),
+                    FontSize = Math.Max(11, _settings.FontSize * 0.35),
+                    Margin = new Thickness(0, 2, 0, 4),
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                innerStack.Children.Add(urlText);
+            }
+
+            if (note.Notes.Count > 0)
+            {
+                var preview = string.Join(" ", note.Notes); if (preview.Length > 80) preview = preview[..80] + "...";
+                innerStack.Children.Add(new TextBlock
+                {
+                    Text = preview,
+                    Foreground = ParseBrush(_settings.TextColor, _settings.TextOpacity * 0.72),
+                    FontSize = Math.Max(12, _settings.FontSize * 0.4),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 6)
+                });
+            }
+
+            var actionBar = new StackPanel { Orientation = WpfOrientation.Horizontal, HorizontalAlignment = WpfHorizontalAlignment.Right };
+            var editBtn = new WpfButton
+            {
+                Content = "编辑",
+                Tag = note,
+                MinWidth = 40,
+                Height = 24,
+                Margin = new Thickness(0, 0, 6, 0),
+                FontSize = 12,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Background = new SolidColorBrush(WpfColor.FromArgb(24, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(WpfColor.FromArgb(40, 255, 255, 255)),
+                Padding = new Thickness(4, 0, 4, 0)
+            };
+            editBtn.Click += EditNote_Click;
+            actionBar.Children.Add(editBtn);
+
+            var delBtn = new WpfButton
+            {
+                Content = "删除",
+                Tag = note,
+                MinWidth = 40,
+                Height = 24,
+                FontSize = 12,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Background = new SolidColorBrush(WpfColor.FromArgb(24, 239, 71, 111)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(WpfColor.FromArgb(60, 239, 71, 111)),
+                Padding = new Thickness(4, 0, 4, 0)
+            };
+            delBtn.Click += DeleteNote_Click;
+            actionBar.Children.Add(delBtn);
+
+            innerStack.Children.Add(actionBar);
+            panel.Child = innerStack;
+            WebNoteListPanel.Children.Add(panel);
+        }
+    }
+
+    private void NoteTitle_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: WebNoteGroup note } && !string.IsNullOrWhiteSpace(note.Url))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = note.Url,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+    }
+
+    private void AddNote_Click(object? sender, RoutedEventArgs e)
+    {
+        _editingNoteGroup = null;
+        NoteTitleInput.Text = "";
+        NoteUrlInput.Text = "";
+        NoteContentInput.Text = "";
+
+
+
+        NoteEditorPanel.Visibility = Visibility.Visible;
+        NoteTitleInput.Focus();
+    }
+
+    private void EditNote_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: WebNoteGroup group })
+        {
+            _editingNoteGroup = group;
+            NoteTitleInput.Text = group.Title;
+            NoteUrlInput.Text = group.Url;
+            NoteContentInput.Text = string.Join("\n", group.Notes);
+            NoteEditorPanel.Visibility = Visibility.Visible;
+            NoteTitleInput.Focus();
+        }
+    }
+
+    private void NoteEditorSave_Click(object? sender, RoutedEventArgs e)
+    {
+        var title = (NoteTitleInput.Text ?? "").Trim();
+        var url = (NoteUrlInput.Text ?? "").Trim();
+        var notes = (NoteContentInput.Text ?? "").Trim();
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            System.Windows.MessageBox.Show("请输入网址。", "提示");
+            return;
+        }
+
+        if (_editingNoteGroup is not null)
+        {
+            _editingNoteGroup.Title = string.IsNullOrWhiteSpace(title) ? url : title;
+            _editingNoteGroup.Url = url;
+            _editingNoteGroup.Notes.Clear(); if (!string.IsNullOrWhiteSpace(notes)) _editingNoteGroup.Notes.Add(notes);
+            _editingNoteGroup.UpdatedAt = DateTime.Now;
+        }
+        else
+        {
+            _notes.Add(new WebNoteGroup
+            {
+                Id = Guid.NewGuid().ToString(),
+                Title = string.IsNullOrWhiteSpace(title) ? url : title,
+                Url = url,
+                Notes = string.IsNullOrWhiteSpace(notes) ? [] : new System.Collections.Generic.List<string> { notes },
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            });
+        }
+
+        _editingNoteGroup = null;
+        _storage.SaveWebNotes(_notes);
+        NoteEditorPanel.Visibility = Visibility.Collapsed;
+        RenderWebNotes();
+    }
+
+    private void NoteEditorCancel_Click(object? sender, RoutedEventArgs e)
+    {
+        _editingNoteGroup = null;
+        NoteEditorPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void DeleteNote_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: WebNoteGroup group })
+        {
+            _notes.Remove(group);
+            _storage.SaveWebNotes(_notes);
+            RenderWebNotes();
+        }
+    }
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
@@ -1050,3 +1335,9 @@ public partial class MainWindow : Window
         int cy,
         int uFlags);
 }
+
+
+
+
+
+

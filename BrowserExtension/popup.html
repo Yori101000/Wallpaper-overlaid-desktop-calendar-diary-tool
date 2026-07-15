@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      min-height: 200px;
+      font-family: -apple-system, "Microsoft YaHei", sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 16px;
+    }
+    h2 {
+      font-size: 16px;
+      color: #FFD166;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .status-card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #2a2a4a;
+    }
+    .status-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .status-value {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .status-value.online { color: #4CAF50; }
+    .status-value.offline { color: #f44336; }
+    .last-saved {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #2a2a4a;
+    }
+    .last-saved .label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .last-saved .text {
+      font-size: 13px;
+      color: #ddd;
+      word-break: break-all;
+    }
+    .last-saved .time {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .empty {
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      padding: 20px 0;
+    }
+    .instructions {
+      margin-top: 12px;
+      padding: 10px;
+      background: #0f3460;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #aaa;
+    }
+    .instructions strong {
+      color: #FFD166;
+    }
+  </style>
+</head>
+<body>
+  <h2>📝 划线保存到日历</h2>
+  <div class="status-card">
+    <div class="status-label">桌面应用状态</div>
+    <div class="status-value" id="appStatus">检测中...</div>
+  </div>
+  <div class="last-saved">
+    <div class="label">最近保存</div>
+    <div id="lastSavedContent">
+      <div class="empty">暂无保存记录</div>
+    </div>
+  </div>
+  <div class="instructions">
+    <strong>使用方法：</strong><br>
+    1. 在网页上选中文字<br>
+    2. 右键 → <strong>划线保存到透明日历</strong><br>
+    3. 或按 <strong>Ctrl+Shift+S</strong>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-namespace TransparentCalendar.Models;
+﻿namespace TransparentCalendar.Models;
 
 public sealed class AppSettings
 {
@@ -13,9 +13,12 @@ public sealed class AppSettings
     public string TextColor { get; set; } = "#FFFFFFFF";
     public bool IsLocked { get; set; }
     public bool StartWithMonday { get; set; } = true;
+    public double BackgroundOpacity { get; set; } = 1.0;
     public bool StartOnBoot { get; set; }
     public bool KeepOnTop { get; set; }
     public bool AttachToDesktopLayer { get; set; } = true;
     public bool CloseToTray { get; set; } = true;
     public bool StartInTray { get; set; }
 }
+
+

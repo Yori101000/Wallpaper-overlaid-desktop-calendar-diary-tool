@@ -1,0 +1,42 @@
+﻿{
+  "manifest_version": 3,
+  "name": "划线保存到透明日历",
+  "version": "1.0",
+  "description": "在网页上划线高亮并保存到透明日历桌面应用",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:51999/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "划线保存到透明日历"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "commands": {
+    "save-highlight": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "保存选中文本到日历"
+    }
+  }
+}

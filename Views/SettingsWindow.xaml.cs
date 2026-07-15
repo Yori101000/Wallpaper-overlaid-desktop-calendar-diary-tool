@@ -52,6 +52,7 @@ public partial class SettingsWindow : Window
             AttachToDesktopLayer = settings.AttachToDesktopLayer,
             CloseToTray = settings.CloseToTray,
             StartInTray = settings.StartInTray,
+            BackgroundOpacity = settings.BackgroundOpacity,
             StartOnBoot = _startup.IsEnabled()
         };
 
@@ -89,7 +90,8 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        Settings.TextOpacity = OpacitySlider.Value;
+        Settings.BackgroundOpacity = BgOpacitySlider.Value;
+            Settings.TextOpacity = OpacitySlider.Value;
         Settings.FontSize = FontSizeSlider.Value;
         Settings.ThemePreset = GetSelectedThemePreset();
         Settings.SidebarPosition = GetSelectedSidebarPosition();
@@ -193,6 +195,12 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void BgOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (BgOpacityValue is null) return;
+        BgOpacityValue.Text = BgOpacitySlider.Value.ToString("P0", CultureInfo.GetCultureInfo("zh-CN"));
+    }
+
     private void UpdateSliderLabels()
     {
         if (OpacityValue is null || FontSizeValue is null)
@@ -200,7 +208,8 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        OpacityValue.Text = OpacitySlider.Value.ToString("P0", CultureInfo.GetCultureInfo("zh-CN"));
+        BgOpacityValue.Text = BgOpacitySlider.Value.ToString("P0", CultureInfo.GetCultureInfo("zh-CN"));
+            OpacityValue.Text = OpacitySlider.Value.ToString("P0", CultureInfo.GetCultureInfo("zh-CN"));
         FontSizeValue.Text = FontSizeSlider.Value.ToString("F0", CultureInfo.InvariantCulture);
     }
 
@@ -209,6 +218,7 @@ public partial class SettingsWindow : Window
         _isApplyingSettingsToControls = true;
         try
         {
+            BgOpacitySlider.Value = Settings.BackgroundOpacity;
             OpacitySlider.Value = Settings.TextOpacity;
             FontSizeSlider.Value = Settings.FontSize;
             ColorText.Text = Settings.TextColor;

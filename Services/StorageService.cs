@@ -1,6 +1,7 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using TransparentCalendar.Models;
+
 
 namespace TransparentCalendar.Services;
 
@@ -17,6 +18,7 @@ public sealed class StorageService
 
     public string SettingsPath => Path.Combine(AppDataDirectory, "settings.json");
     public string CalendarDataPath => Path.Combine(AppDataDirectory, "calendar-data.json");
+    public string WebNotesPath => Path.Combine(AppDataDirectory, "web-notes.json");
     public string BackupDirectory => Path.Combine(AppDataDirectory, "backups");
 
     public void EnsureDirectory()
@@ -34,6 +36,18 @@ public sealed class StorageService
     {
         EnsureDirectory();
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, _jsonOptions));
+    }
+
+    public List<WebNoteGroup> LoadWebNotes()
+    {
+        EnsureDirectory();
+        return LoadJson(WebNotesPath, new List<WebNoteGroup>());
+    }
+
+    public void SaveWebNotes(List<WebNoteGroup> notes)
+    {
+        EnsureDirectory();
+        File.WriteAllText(WebNotesPath, JsonSerializer.Serialize(notes, _jsonOptions));
     }
 
     public Dictionary<string, CalendarEntry> LoadEntries()
@@ -149,3 +163,4 @@ public sealed class StorageService
         }
     }
 }
+
