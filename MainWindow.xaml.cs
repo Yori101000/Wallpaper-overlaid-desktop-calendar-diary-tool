@@ -1105,7 +1105,6 @@ public partial class MainWindow : Window
     private void RenderWebNotes()
     {
         WebNoteListPanel.Children.Clear();
-        _notes = _storage.LoadWebNotes();
 
         // Update bookmarklet code display
         var port = _noteListener?.Port ?? 51999;
