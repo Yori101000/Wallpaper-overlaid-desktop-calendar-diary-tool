@@ -337,7 +337,10 @@ public partial class MainWindow : Window
 
     private static string BuildDayToolTip(DateTime date, bool hasTodos, bool hasDiary, int unfinishedCount)
     {
-        return null;
+        var parts = new List<string> { date.ToString("yyyy-MM-dd dddd") };
+        if (hasTodos) parts.Add($"待办 {unfinishedCount} 项未完成");
+        if (hasDiary) parts.Add("含日记");
+        return string.Join(" · ", parts);
     }
 
     private void RenderTodayTodos()
