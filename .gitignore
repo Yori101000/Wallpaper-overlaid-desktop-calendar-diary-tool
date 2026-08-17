@@ -20,18 +20,9 @@ obj/
 .DS_Store
 
 # Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
+# 只忽略构建输出目录本身（bin/ obj/ 已在上方声明）。
+# 不要用 [Dd]ebug/ / [Ll]ogs/ 这类通配 —— 它们会连同名的源码目录一起忽略掉。
 bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
 
 # Local planning notes
 计划.txt
