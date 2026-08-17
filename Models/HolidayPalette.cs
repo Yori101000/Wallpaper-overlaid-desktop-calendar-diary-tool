@@ -40,6 +40,24 @@ public static class HolidayPalette
     /// </summary>
     public const string FarWork = "#C58AFF";
 
+    /// <summary>
+    /// 「今天」的专属色：天蓝，色相 ≈211°。
+    ///
+    /// 色相空间已被占掉四段（休 163°、班 30°/337°/272°），干净的空档只剩 210 附近。
+    /// 与休差 48°、与基准班差 179°、与玫红班差 126°、与紫班差 61°。
+    /// </summary>
+    public const string BaseToday = "#6FB3FF";
+
+    /// <summary>
+    /// 备用今日色：紫，色相 ≈258°。文字色本身偏蓝（天蓝距它不足 45°）时启用。
+    ///
+    /// **不能取黄绿**：文字色偏青时休色已经避让到黄绿 `#9BE870`，今日色再取它就完全同色 ——
+    /// 这个坑是被 <c>今天色_与休班和文字色都拉得开</c> 那条不变量测试逮出来的。
+    /// 也不能直接复用班色的紫 <see cref="FarWork"/>：那两支虽然实际不会同时启用，
+    /// 但同一个色值担两种语义，改一处就会莫名其妙影响另一处。
+    /// </summary>
+    public const string AltToday = "#A98BFF";
+
     /// <summary>低于此饱和度（白、浅灰、高对比）没有色相可撞，直接用基准两支。</summary>
     private const double MinSaturation = 0.15;
 
@@ -50,6 +68,7 @@ public static class HolidayPalette
     // 休只有两支：两支之间唯一的缺口在 120° 附近（纯绿文字），那时基准仍有 43°，够用。
     private static readonly string[] OffCandidates = [BaseOff, AltOff];
     private static readonly string[] WorkCandidates = [BaseWork, AltWork, FarWork];
+    private static readonly string[] TodayCandidates = [BaseToday, AltToday];
 
     /// <summary>按当前文字色决定「休 / 班」两支该用哪个候选。</summary>
     public static (string Off, string Work) Resolve(string? textColor)
@@ -66,6 +85,21 @@ public static class HolidayPalette
         }
 
         return (Pick(hue, OffCandidates), Pick(hue, WorkCandidates));
+    }
+
+    /// <summary>
+    /// 「今天」的数字颜色，同样按文字色避让。走的是与休/班完全相同的挑选逻辑，
+    /// 不要另写一套 —— 那两条规则（顺序优先、兜底取最远）是被单测钉住的。
+    /// </summary>
+    public static string ResolveToday(string? textColor)
+    {
+        if (!TryParse(textColor, out var r, out var g, out var b))
+        {
+            return BaseToday;
+        }
+
+        var (hue, saturation) = HueSaturation(r, g, b);
+        return saturation < MinSaturation ? BaseToday : Pick(hue, TodayCandidates);
     }
 
     /// <summary>

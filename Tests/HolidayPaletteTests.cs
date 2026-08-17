@@ -103,6 +103,42 @@ public class HolidayPaletteTests
         Assert.Equal(HolidayPalette.BaseWork, work);
     }
 
+    [Fact]
+    public void 今天色_白色文字用基准天蓝()
+    {
+        Assert.Equal(HolidayPalette.BaseToday, HolidayPalette.ResolveToday("#FFFFFFFF"));
+    }
+
+    /// <summary>
+    /// 「今天」的天蓝（211°）与日记圆点的青（189°）只差 22°，但那是**圆点**、这是**数字**，
+    /// 族别不同。真正要避的是同为数字颜色的休与班，以及用户自己的文字色。
+    /// </summary>
+    [Theory]
+    [InlineData("#FFFFFF")]
+    [InlineData("#7BDFF2")]
+    [InlineData("#FFD166")]
+    [InlineData("#FF0000")]
+    [InlineData("#00FF00")]
+    [InlineData("#6FB3FF")]
+    public void 今天色_与休班和文字色都拉得开(string textColor)
+    {
+        var today = HolidayPalette.ResolveToday(textColor);
+        var (off, work) = HolidayPalette.Resolve(textColor);
+        var todayHue = HolidayPalette.HueOf(today);
+
+        Assert.True(HolidayPalette.HueDistance(todayHue, HolidayPalette.HueOf(off)) >= 45,
+            $"今天色与休色撞色：{today} / {off}");
+        Assert.True(HolidayPalette.HueDistance(todayHue, HolidayPalette.HueOf(work)) >= 45,
+            $"今天色与班色撞色：{today} / {work}");
+
+        if (HolidayPalette.SaturationOf(textColor) >= 0.15)
+        {
+            Assert.True(
+                HolidayPalette.HueDistance(todayHue, HolidayPalette.HueOf(textColor)) >= 40,
+                $"今天色与文字色撞色：{today} vs {textColor}");
+        }
+    }
+
     /// <summary>
     /// 不变量：无论文字色是什么，休与班之间必须拉开（否则两种法定属性互相混），
     /// 且各自与文字色拉开（否则和普通日期混）。饱和度过低的文字色不参与后一条。

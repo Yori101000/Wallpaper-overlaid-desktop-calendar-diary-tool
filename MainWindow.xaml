@@ -83,8 +83,10 @@
             1) GhostButtonStyle —— 无底、无描边，只有文字或字形；hover 才浮现一块底。
                界面早已是**单层**半透明表面，按钮再各自带底色与白描边就是"盒子套盒子"的回潮，
                一排灰方块压在玻璃上正是之前难看的根源。
-            2) SegmentButtonStyle —— 三个视图模式共享一个胶囊底，选中项是一块实心滑块。
-               它表达的是"三选一"，与幽灵按钮表达的"点一下做件事"是两回事。
+            2) SegmentButtonStyle —— 三个视图模式，选中项下方一条 2px 指示线（tab 式）。
+               **顶栏里不出现任何色块**：胶囊底曾经是这一行唯一有底色的东西，于是它成了
+               视觉重心，可这一行最重要的信息是月份。去掉之后整行只剩文字与线条，
+               气质统一，标题自然成为重心。
         -->
         <Style x:Key="GhostButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -139,22 +141,24 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <!-- 滑块用 Background 承载：选中态由 UpdateModeButtons 赋值，
-                             未选中是 Transparent，胶囊底由外层 Border 统一提供。 -->
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="6">
+                        <!-- 指示线用 Background 承载：选中态由 UpdateModeButtons 赋值成实色，
+                             未选中是 Transparent。文字本身不带任何底。 -->
+                        <StackPanel Background="Transparent">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               TextElement.Foreground="{TemplateBinding Foreground}"/>
-                        </Border>
+                            <Border x:Name="Indicator" Height="2" CornerRadius="1"
+                                    Margin="{TemplateBinding Padding}"
+                                    Background="{TemplateBinding Background}"/>
+                        </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.82"/>
+                                <Setter Property="Opacity" Value="0.85"/>
                             </Trigger>
+                            <!-- 幽灵按钮平时没有边界，键盘焦点必须看得见 -->
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
+                                <Setter TargetName="Indicator" Property="Background" Value="#66FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -169,7 +173,9 @@
             <Setter Property="SelectionBrush" Value="#66FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="#14FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#26FFFFFF"/>
+            <!-- 静止态无描边：它与今日块是同一族浅色浮层，必须同底色、同圆角、同无边框。
+                 描边只作为 hover / 键盘焦点的反馈出现（见下面的触发器）。 -->
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Padding" Value="10,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
@@ -179,7 +185,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
+                                CornerRadius="9">
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="{TemplateBinding Padding}"
                                           VerticalAlignment="Center"
@@ -335,12 +341,8 @@
 
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
                         <!-- 分段控件：三个模式共享一个胶囊底，选中项是实心滑块 -->
-                        <!-- 胶囊只留一层极淡的底、不加描边：它是"三选一"的容器，
-                             不该比顶栏上任何一个文字都重。 -->
-                        <Border x:Name="ModeSegment" CornerRadius="7" Padding="2"
-                                Margin="0,0,10,0"
-                                Background="#12FFFFFF"
-                                VerticalAlignment="Center">
+                        <!-- 容器不再有底色，只是三个 tab 的排列容器 -->
+                        <Border x:Name="ModeSegment" Margin="0,0,12,0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
                                 <!-- 窄窗口下文字会被 UpdateModeButtonLabels 收成单字，
                                      全称留在 ToolTip 里。 -->
@@ -368,25 +370,39 @@
                         </Button>
                         <Button x:Name="SettingsBtn" Content="设置" Click="Settings_Click"
                                 Style="{StaticResource GhostButtonStyle}"/>
-                        <!-- ✕ 与「设置」之间拉开一段：它是这一行里唯一"点错就得重开"的按钮 -->
-                        <Button x:Name="CloseBtn" Content="✕" Width="28" Margin="10,0,0,0" Padding="0"
-                                FontSize="13" Click="Close_Click" Style="{StaticResource GhostButtonStyle}"
-                                ToolTip="关闭（Esc）"/>
+                        <!-- ✕ 与「设置」之间拉开一段：它是这一行里唯一"点错就得重开"的按钮。
+                             用矢量两条线而不是字形 ✕ —— 字形笔画不到 1px，与放大镜的 1.4 描边
+                             放在一起粗细不成套。 -->
+                        <Button x:Name="CloseBtn" Width="28" Margin="10,0,0,0" Padding="0"
+                                Click="Close_Click" Style="{StaticResource GhostButtonStyle}"
+                                ToolTip="关闭（Esc）">
+                            <Canvas Width="12" Height="12">
+                                <Line X1="1" Y1="1" X2="11" Y2="11" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                <Line X1="11" Y1="1" X2="1" Y2="11" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Canvas>
+                        </Button>
                     </StackPanel>
                 </DockPanel>
 
                 <!-- 搜索条：平时收起，展开时整条盖住顶栏。十次里有九次用不到，
                      不该常年占一整行。Ctrl+F 或点放大镜展开，Esc 收起。 -->
-                <Border x:Name="SearchOverlay" Visibility="Collapsed"
+                <!--
+                    Margin 6 把顶栏的 20px 内缩补到 26px，与今日块的左右边缘严格相等
+                    （AppSurface 10 + BodyGrid 12 + CalendarViewPanel 4 = 26）。
+                    不要改 HeaderBar 的 Padding —— 那会连带挪动月份标题与右侧整组控件。
+                    ✕ 收进搜索框内部，框本身才能占满整条内容宽度。
+                -->
+                <Border x:Name="SearchOverlay" Visibility="Collapsed" Margin="6,0,6,0"
                         Background="Transparent" VerticalAlignment="Center">
-                    <DockPanel LastChildFill="True">
-                        <Button x:Name="SearchCloseBtn" Content="✕" Width="28" Padding="0" FontSize="13"
-                                DockPanel.Dock="Right" Margin="8,0,0,0" Click="SearchToggle_Click"
-                                Style="{StaticResource GhostButtonStyle}" ToolTip="收起搜索（Esc）"/>
                         <Grid>
                             <!-- 输入框左侧留出 32px 给放大镜：没有图标与占位文字时，
                                  展开后就是一个空洞的黑框，看不出是搜索、也看不出怎么退出。 -->
-                            <TextBox x:Name="SearchTextBox" Height="30" Padding="32,0,10,0"
+                            <!-- 右侧留 34px 给收起按钮，文字不会钻到它下面 -->
+                            <TextBox x:Name="SearchTextBox" Height="30" Padding="32,0,34,0"
                                      Style="{StaticResource OverlayTextBoxStyle}"
                                      TextChanged="SearchTextBox_TextChanged"/>
                             <Canvas Width="14" Height="14" Margin="11,0,0,0"
@@ -402,8 +418,20 @@
                                        Margin="34,0,0,0" FontSize="13"
                                        VerticalAlignment="Center" HorizontalAlignment="Left"
                                        Foreground="#5EFFFFFF" IsHitTestVisible="False"/>
+                            <Button x:Name="SearchCloseBtn" Width="26" Height="26" Padding="0"
+                                    Margin="0,0,3,0" HorizontalAlignment="Right"
+                                    Click="SearchToggle_Click"
+                                    Style="{StaticResource GhostButtonStyle}" ToolTip="收起搜索（Esc）">
+                                <Canvas Width="12" Height="12">
+                                    <Line X1="1" Y1="1" X2="11" Y2="11" StrokeThickness="1.4"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    <Line X1="11" Y1="1" X2="1" Y2="11" StrokeThickness="1.4"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Canvas>
+                            </Button>
                         </Grid>
-                    </DockPanel>
                 </Border>
             </Grid>
         </Border>

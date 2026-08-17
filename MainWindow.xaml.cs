@@ -94,8 +94,8 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush DeleteButtonBorderBrush = CreateFrozenBrush(60, 239, 71, 111);
     private static readonly SolidColorBrush ActionButtonBrush = CreateFrozenBrush(24, 255, 255, 255);
     private static readonly SolidColorBrush ActionButtonBorderBrush = CreateFrozenBrush(40, 255, 255, 255);
-    /// <summary>分段控件里"选中"那一格的滑块。未选中项没有底色，胶囊底由外层统一提供。</summary>
-    private static readonly SolidColorBrush ModeSelectedBrush = CreateFrozenBrush(56, 255, 255, 255);
+    /// <summary>模式 tab 选中时下方那条 2px 指示线。顶栏不出现色块，所以这是它唯一的实色。</summary>
+    private static readonly SolidColorBrush ModeSelectedBrush = CreateFrozenBrush(0xD8, 255, 255, 255);
     // ── 通道一：日期数字的颜色 = 法定属性 ──
     // 存成十六进制串而不是冻结画刷，好让 GetBrush 把透明度也算进缓存键 ——
     // 非本月的放假/调休需要同时降透明度。
@@ -104,6 +104,9 @@ public partial class MainWindow : Window
     // HolidayPalette 会把那一支换到备用色。ApplySettings 是唯一的赋值点。
     private string _holidayOffColor = HolidayPalette.BaseOff;
     private string _holidayWorkColor = HolidayPalette.BaseWork;
+
+    /// <summary>「今天」的专属数字颜色，同样按文字色避让。与休/班一起在 ApplySettings 里算。</summary>
+    private string _todayColor = HolidayPalette.BaseToday;
 
     // ── 通道二：圆点与徽章 = 用户内容（重要用玫红，与放假的青绿拉开）──
     private static readonly SolidColorBrush ImportantMarkerBrush = CreateFrozenBrush(0xFF, 0x6B, 0x8A);
@@ -260,6 +263,7 @@ public partial class MainWindow : Window
         // 假日两支颜色要按当前文字色避让，且必须在任何 Render* 之前算好 ——
         // 主题预设与自定义文字色都汇聚在这里，别处不要再推导一遍。
         (_holidayOffColor, _holidayWorkColor) = HolidayPalette.Resolve(_settings.TextColor);
+        _todayColor = HolidayPalette.ResolveToday(_settings.TextColor);
 
         NormalizeWindowBounds();
         Left = _settings.Left;
@@ -496,12 +500,12 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 分段控件的选中态：只靠一块实心滑块 + 字重，未选中项完全无底 ——
-    /// 胶囊底由外层 <c>ModeSegment</c> 统一提供，每个按钮不再各自带底色与描边。
+    /// 模式 tab 的选中态：文字提亮加粗 + 下方一条指示线（Background 在模板里绑到指示线）。
+    /// 顶栏里不出现色块，所以未选中项完全没有底与线。
     /// </summary>
     private static void SetModeButtonSelected(WpfButton button, bool isSelected)
     {
-        button.Opacity = isSelected ? 1 : 0.62;
+        button.Opacity = isSelected ? 1 : 0.58;
         button.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal;
         button.Background = isSelected ? ModeSelectedBrush : WpfBrushes.Transparent;
     }
@@ -610,11 +614,11 @@ public partial class MainWindow : Window
             EndPoint = new WpfPoint(0, 1),
             GradientStops =
             {
-                // 0x33 在亮壁纸上会变成一条穿过整个月历的亮线，比它要表达的"周末"还显眼。
-                // 降到 0x1C 并把渐变收进来一点：需要时看得见，不需要时不抢戏。
+                // 0x33 在亮壁纸上是一条穿过整个月历的亮线，比它要表达的"周末"还显眼；
+                // 但降到 0x1C 又几乎看不见，等于没有。0x26 是两次实拍之后的折中。
                 new GradientStop(WpfColor.FromArgb(0x00, 255, 255, 255), 0.0),
-                new GradientStop(WpfColor.FromArgb(0x1C, 255, 255, 255), 0.18),
-                new GradientStop(WpfColor.FromArgb(0x1C, 255, 255, 255), 0.82),
+                new GradientStop(WpfColor.FromArgb(0x26, 255, 255, 255), 0.18),
+                new GradientStop(WpfColor.FromArgb(0x26, 255, 255, 255), 0.82),
                 new GradientStop(WpfColor.FromArgb(0x00, 255, 255, 255), 1.0)
             }
         };

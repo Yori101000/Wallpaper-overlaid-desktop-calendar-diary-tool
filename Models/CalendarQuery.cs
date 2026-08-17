@@ -17,7 +17,10 @@ public enum DayEmphasis
     HolidayOff,
 
     /// <summary>调休上班。</summary>
-    HolidayWork
+    HolidayWork,
+
+    /// <summary>今天。优先级最高，盖过法定属性。</summary>
+    Today
 }
 
 /// <summary>未完成待办的紧急度分组。</summary>
@@ -173,16 +176,81 @@ public static class CalendarQuery
         return unfinishedCount <= 0 ? string.Empty : $"未完成 {unfinishedCount} 项";
     }
 
+    /// <summary>
+    /// 今日块右侧摘要要显示哪几条：**今天的未完成项优先，不足则补当月其余未完成项**。
+    ///
+    /// 今日块被压成一行之后，只有一两条待办时右边会空掉三分之二。与其留白，不如把
+    /// 当月其他还欠着的事顺带带出来 —— 它本来就是"今天要面对什么"这块的一部分。
+    ///
+    /// 返回的每一项都带日期，界面据此给非今天的项加日期前缀，否则会被读成今天的。
+    /// 排序复用 <see cref="OrderUnfinished"/>，不要另写一套。
+    /// </summary>
+    public static List<(DateTime Date, TodoItem Todo)> BuildTodayPanelSummary(
+        IReadOnlyDictionary<string, CalendarEntry> entries,
+        DateTime today,
+        int maxCount)
+    {
+        if (maxCount <= 0)
+        {
+            return [];
+        }
+
+        var unfinished = new List<(DateTime Date, TodoItem Todo)>();
+        foreach (var (key, entry) in entries)
+        {
+            if (DateKeys.ParseDateKey(key) is not { } date)
+            {
+                continue;
+            }
+
+            foreach (var todo in entry.Todos)
+            {
+                if (!todo.IsDone && !string.IsNullOrWhiteSpace(todo.Text))
+                {
+                    unfinished.Add((date, todo));
+                }
+            }
+        }
+
+        var todayItems = OrderUnfinished(unfinished.Where(item => item.Date.Date == today.Date));
+        if (todayItems.Count >= maxCount)
+        {
+            return todayItems.Take(maxCount).ToList();
+        }
+
+        // 补位的只取当月，且逾期的排在未来的前面（OrderUnfinished 已经按日期升序）
+        var sameMonth = OrderUnfinished(unfinished.Where(item =>
+            item.Date.Date != today.Date
+            && item.Date.Year == today.Year
+            && item.Date.Month == today.Month));
+
+        return todayItems.Concat(sameMonth).Take(maxCount).ToList();
+    }
+
+    /// <summary>今日块摘要里非今天那几条的前缀（<c>19日 · </c>），今天的不加。</summary>
+    public static string BuildSummaryDatePrefix(DateTime date, DateTime today)
+    {
+        return date.Date == today.Date ? string.Empty : $"{date.Day}日 · ";
+    }
+
     private const int ToolTipTodoCount = 3;
 
     /// <summary>
-    /// 日期数字的强调类型。优先级：<c>放假 &gt; 调休 &gt; 非本月 &gt; 普通</c>。
+    /// 日期数字的强调类型。优先级：<c>今天 &gt; 放假 &gt; 调休 &gt; 非本月 &gt; 普通</c>。
+    ///
+    /// **今天排在最前**：一个数字只能有一种颜色，今天恰好是放假日时以"今天"为准 ——
+    /// 那天的法定属性由农历行末尾的 <c>· 休</c> / <c>· 班</c> 承担，信息不丢。
     ///
     /// 放假/调休**故意排在非本月之前**：跨月的首尾行会显示邻月日期，而"邻月的 10 月 1 日放假"
     /// 依然是用户需要看到的信息，不该因为不在当月就被压成灰色。
     /// </summary>
-    public static DayEmphasis ResolveEmphasis(bool isCurrentMonth, bool? isOffDay)
+    public static DayEmphasis ResolveEmphasis(bool isCurrentMonth, bool? isOffDay, bool isToday = false)
     {
+        if (isToday)
+        {
+            return DayEmphasis.Today;
+        }
+
         if (isOffDay is true)
         {
             return DayEmphasis.HolidayOff;
@@ -216,13 +284,19 @@ public static class CalendarQuery
         return startWithMonday ? column >= 5 : column is 0 or 6;
     }
 
-    /// <summary>农历行末尾追加的假日后缀（"· 休" / "· 班"），没有则为空。</summary>
-    public static string HolidaySuffix(DayEmphasis emphasis)
+    /// <summary>
+    /// 农历行末尾追加的假日后缀（"· 休" / "· 班"），没有则为空。
+    ///
+    /// 直接认 <paramref name="isOffDay"/> 而不是 <see cref="DayEmphasis"/>：今天的数字颜色
+    /// 被"今天"占用后，emphasis 已经不再携带法定属性，但后缀**必须照常显示** ——
+    /// 那是今天当天唯一还在表达"休/班"的地方。
+    /// </summary>
+    public static string HolidaySuffix(bool? isOffDay)
     {
-        return emphasis switch
+        return isOffDay switch
         {
-            DayEmphasis.HolidayOff => " · 休",
-            DayEmphasis.HolidayWork => " · 班",
+            true => " · 休",
+            false => " · 班",
             _ => string.Empty
         };
     }

@@ -279,13 +279,128 @@ public class DayEmphasisTests
     }
 
     [Theory]
-    [InlineData(DayEmphasis.HolidayOff, " · 休")]
-    [InlineData(DayEmphasis.HolidayWork, " · 班")]
-    [InlineData(DayEmphasis.Normal, "")]
-    [InlineData(DayEmphasis.Adjacent, "")]
-    public void 农历行的假日后缀(DayEmphasis emphasis, string expected)
+    [InlineData(true, " · 休")]
+    [InlineData(false, " · 班")]
+    [InlineData(null, "")]
+    public void 农历行的假日后缀(bool? isOffDay, string expected)
     {
-        Assert.Equal(expected, HolidaySuffix(emphasis));
+        Assert.Equal(expected, HolidaySuffix(isOffDay));
+    }
+
+    /// <summary>
+    /// 「今天」的优先级高于法定属性：一个数字只能有一种颜色。
+    /// 今天当天的休/班改由农历行后缀承担，所以后缀**必须与 emphasis 解耦**。
+    /// </summary>
+    [Fact]
+    public void 今天盖过放假与调休()
+    {
+        Assert.Equal(DayEmphasis.Today, ResolveEmphasis(isCurrentMonth: true, isOffDay: true, isToday: true));
+        Assert.Equal(DayEmphasis.Today, ResolveEmphasis(isCurrentMonth: true, isOffDay: false, isToday: true));
+        Assert.Equal(DayEmphasis.Today, ResolveEmphasis(isCurrentMonth: true, isOffDay: null, isToday: true));
+    }
+
+    [Fact]
+    public void 今天是放假日时后缀仍然给出休()
+    {
+        var emphasis = ResolveEmphasis(isCurrentMonth: true, isOffDay: true, isToday: true);
+        Assert.Equal(DayEmphasis.Today, emphasis);
+        // 颜色让给了"今天"，但法定属性不能丢 —— 它由后缀承担
+        Assert.Equal(" · 休", HolidaySuffix(true));
+    }
+
+    [Fact]
+    public void 不是今天时优先级维持原样()
+    {
+        Assert.Equal(DayEmphasis.HolidayOff, ResolveEmphasis(isCurrentMonth: false, isOffDay: true, isToday: false));
+        Assert.Equal(DayEmphasis.Adjacent, ResolveEmphasis(isCurrentMonth: false, isOffDay: null, isToday: false));
+    }
+
+    // ── 今日块的摘要 ──────────────────────────────────────────────
+
+    private static Dictionary<string, CalendarEntry> Entries(params (string Key, string[] Todos)[] items)
+    {
+        var map = new Dictionary<string, CalendarEntry>();
+        foreach (var (key, todos) in items)
+        {
+            map[key] = new CalendarEntry
+            {
+                Date = key,
+                Todos = todos.Select(text => new TodoItem { Text = text }).ToList()
+            };
+        }
+
+        return map;
+    }
+
+    [Fact]
+    public void 今日块摘要_今天的排在最前()
+    {
+        var today = new DateTime(2026, 8, 17);
+        var entries = Entries(
+            ("2026-08-19", ["交周报"]),
+            ("2026-08-17", ["吃饭"]));
+
+        var summary = BuildTodayPanelSummary(entries, today, 3);
+
+        Assert.Equal("吃饭", summary[0].Todo.Text);
+        Assert.Equal(today, summary[0].Date);
+    }
+
+    [Fact]
+    public void 今日块摘要_今天不够时补当月其余未完成项()
+    {
+        var today = new DateTime(2026, 8, 17);
+        var entries = Entries(
+            ("2026-08-17", ["吃饭"]),
+            ("2026-08-19", ["交周报"]),
+            ("2026-09-02", ["下个月的事"]));
+
+        var summary = BuildTodayPanelSummary(entries, today, 3);
+
+        Assert.Equal(2, summary.Count);
+        Assert.DoesNotContain(summary, item => item.Todo.Text == "下个月的事");
+    }
+
+    [Fact]
+    public void 今日块摘要_今天够了就不补别的()
+    {
+        var today = new DateTime(2026, 8, 17);
+        var entries = Entries(
+            ("2026-08-17", ["甲", "乙"]),
+            ("2026-08-19", ["交周报"]));
+
+        var summary = BuildTodayPanelSummary(entries, today, 2);
+
+        Assert.Equal(2, summary.Count);
+        Assert.All(summary, item => Assert.Equal(today, item.Date));
+    }
+
+    [Fact]
+    public void 今日块摘要_已完成的不进摘要()
+    {
+        var today = new DateTime(2026, 8, 17);
+        var entries = new Dictionary<string, CalendarEntry>
+        {
+            ["2026-08-17"] = new()
+            {
+                Date = "2026-08-17",
+                Todos = [new TodoItem { Text = "做完了", IsDone = true }, new TodoItem { Text = "没做" }]
+            }
+        };
+
+        var summary = BuildTodayPanelSummary(entries, today, 3);
+
+        Assert.Single(summary);
+        Assert.Equal("没做", summary[0].Todo.Text);
+    }
+
+    [Theory]
+    [InlineData(2026, 8, 17, "")]
+    [InlineData(2026, 8, 19, "19日 · ")]
+    public void 今日块摘要_非今天的带日期前缀(int year, int month, int day, string expected)
+    {
+        var today = new DateTime(2026, 8, 17);
+        Assert.Equal(expected, BuildSummaryDatePrefix(new DateTime(year, month, day), today));
     }
 }
 

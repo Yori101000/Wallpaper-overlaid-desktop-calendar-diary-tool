@@ -179,7 +179,7 @@ public partial class MainWindow : Window
     {
         var isToday = date.Date == DateTime.Today;
         var holiday = GetHoliday(date);
-        var emphasis = ResolveEmphasis(isCurrentMonth, holiday?.IsOffDay);
+        var emphasis = ResolveEmphasis(isCurrentMonth, holiday?.IsOffDay, isToday);
 
         // 数字的颜色只承载**法定属性**（放假/调休）。周末交给 5+2 分割线，
         // 今天交给格子的填充与内描边 —— 三者各占一条通道，互不侵占。
@@ -193,22 +193,21 @@ public partial class MainWindow : Window
         // 走 GetBrush 而不是用静态冻结画刷，透明度才能作用到假日色上（缓存仍然生效）
         var numberBrush = emphasis switch
         {
+            DayEmphasis.Today => GetBrush(_todayColor, 1),
             DayEmphasis.HolidayOff => GetBrush(_holidayOffColor, opacity),
             DayEmphasis.HolidayWork => GetBrush(_holidayWorkColor, opacity),
             _ => TextBrush(opacity)
         };
 
         var lunarLabel = _settings.ShowLunar ? LunarCalendar.GetInfo(date) : null;
-        var holidaySuffix = HolidaySuffix(emphasis);
 
-        // 今天的这一行直接写「今天」两个字。
-        //
-        // 这是文字而不是装饰 —— 装饰那一族（填充、描边、圆、横线）前后被否掉十种，
-        // 而这一行本来就在，写字不占新空间。今天的农历在今日块里已经完整给出（农历七月初二），
-        // 格子里不必重复；假日后缀仍然保留。
-        var almanacText = isToday
-            ? TodayCellLabel + holidaySuffix
-            : (lunarLabel?.Label ?? string.Empty) + holidaySuffix;
+        // 后缀直接认 holiday.IsOffDay：今天的数字颜色已被"今天"占用，emphasis 不再携带
+        // 法定属性，但「· 休 / · 班」必须照常显示 —— 那是今天当天唯一还在表达它的地方。
+        var holidaySuffix = HolidaySuffix(holiday?.IsOffDay);
+
+        // 今天不再写「今天」二字：数字已经有专属颜色 + 放大 + 加粗三重表达，
+        // 再占掉农历行就是第四重，而农历（初五）比重复一遍"今天"信息量更大。
+        var almanacText = (lunarLabel?.Label ?? string.Empty) + holidaySuffix;
         var almanacFontSize = ScaledFont(FontScale.Almanac, 9);
 
         // 三行**定高**：数字 / 农历 / 圆点。
@@ -238,10 +237,13 @@ public partial class MainWindow : Window
         // 「今天」靠**字号 + 字重 + 满亮度**跳出来，不加任何装饰。
         // 一屏 42 个数字里只靠加粗是找不到的（实测），而放大一档不占新空间：
         // 数字行是定高的，字号变化不会顶动农历行，也不会让整行基线参差。
+        // 徽章的偏移也要用它：按基准字号算的话，今天放大后徽章会压在数字笔画上。
+        var numberSize = isToday ? _settings.FontSize * TodayNumberScale : _settings.FontSize;
+
         var dayNumber = new TextBlock
         {
             Text = date.Day.ToString(CultureInfo.InvariantCulture),
-            FontSize = isToday ? _settings.FontSize * TodayNumberScale : _settings.FontSize,
+            FontSize = numberSize,
             FontWeight = isToday ? FontWeights.Bold : FontWeights.Medium,
             Foreground = numberBrush,
             HorizontalAlignment = WpfHorizontalAlignment.Center,
@@ -265,6 +267,9 @@ public partial class MainWindow : Window
                 FontSize = almanacFontSize,
                 Foreground = emphasis switch
                 {
+                    // 今天的农历行跟着数字走同一支色，只压一点亮度：数字有色而副行还是灰的，
+                    // 那一格会显得上下脱节。
+                    DayEmphasis.Today => GetBrush(_todayColor, 0.85),
                     DayEmphasis.HolidayOff => GetBrush(_holidayOffColor, opacity * 0.9),
                     DayEmphasis.HolidayWork => GetBrush(_holidayWorkColor, opacity * 0.9),
                     _ => isHighlighted ? TextBrush(opacity * 0.88) : TextBrush(opacity * 0.52)
@@ -290,7 +295,10 @@ public partial class MainWindow : Window
             content.Children.Add(marker);
         }
 
-        if (unfinishedCount > 0)
+        // 今天那格**不画徽章**：今日块已经在最显眼处写着「未完成 N 项」，格子里再挂一枚
+        // 就是同一件事说两遍；而且天蓝的数字与琥珀的徽章两个饱和色贴在一起，
+        // 那一格会明显比周围躁。今天的待办有没有，看今日块。
+        if (unfinishedCount > 0 && !isToday)
         {
             // 徽章挂在**数字**的右上角，不是格子的右上角。
             //
@@ -307,7 +315,7 @@ public partial class MainWindow : Window
                 Padding = new Thickness(3.5, 0, 3.5, 0),
                 HorizontalAlignment = WpfHorizontalAlignment.Center,
                 VerticalAlignment = WpfVerticalAlignment.Top,
-                Margin = new Thickness(_settings.FontSize * BadgeOffsetRatio, -3, 0, 0),
+                Margin = new Thickness(numberSize * BadgeOffsetRatio, -3, 0, 0),
                 Child = new TextBlock
                 {
                     Text = badgeText,
@@ -475,40 +483,28 @@ public partial class MainWindow : Window
         TodayTodoTitle.Text = hasTodos
             ? BuildTodayUnfinishedLabel(unfinishedTodos.Count)
             : CalendarQuery.TodayEmptyHint;
+        var summary = BuildTodayPanelSummary(_entries, today, TodayTodoPreviewCount);
         TodayTodoTitle.Foreground = TextBrush(opacity * (hasTodos ? 0.75 : 0.45));
         TodayTodoTitle.FontSize = ScaledFont(FontScale.TodayMeta);
         TodayTodoTitle.Effect = OptionalTextShadow(opacity * 0.7);
-        TodayTodoItems.Visibility = hasTodos ? Visibility.Visible : Visibility.Collapsed;
+        TodayTodoItems.Visibility = summary.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        if (!hasTodos)
-        {
-            return;
-        }
-
-        // 摘要与计数排在同一行，装不下就裁剪 —— 今日块只占一行，不再向下长。
-        foreach (var todo in unfinishedTodos.Take(TodayTodoPreviewCount))
+        // 摘要排在同一行，装不下就裁剪 —— 今日块只占一行，不再向下长。
+        // 今天的排前，不足则补当月其余未完成项（非今天的带日期前缀，否则会被读成今天的）。
+        foreach (var (date, todo) in summary)
         {
             var isImportant = IsImportantTodo(todo);
+            var isToday = date.Date == today.Date;
             TodayTodoItems.Children.Add(new TextBlock
             {
-                Text = BuildTodayTodoText(todo, isImportant),
-                Foreground = isImportant ? ImportantMarkerBrush : TextBrush(opacity * 0.92),
+                Text = BuildSummaryDatePrefix(date, today) + BuildTodayTodoText(todo, isImportant),
+                Foreground = isImportant
+                    ? ImportantMarkerBrush
+                    : TextBrush(opacity * (isToday ? 0.92 : 0.6)),
                 FontSize = ScaledFont(FontScale.TodayMeta),
                 Margin = new Thickness(0, 0, 14, 0),
                 VerticalAlignment = WpfVerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Effect = OptionalTextShadow(opacity * 0.7)
-            });
-        }
-
-        if (unfinishedTodos.Count > TodayTodoPreviewCount)
-        {
-            TodayTodoItems.Children.Add(new TextBlock
-            {
-                Text = $"+{unfinishedTodos.Count - TodayTodoPreviewCount}",
-                Foreground = TextBrush(opacity * 0.6),
-                FontSize = ScaledFont(FontScale.TodayMeta),
-                VerticalAlignment = WpfVerticalAlignment.Center,
                 Effect = OptionalTextShadow(opacity * 0.7)
             });
         }
