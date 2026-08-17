@@ -109,7 +109,7 @@ public partial class MainWindow : Window
     {
         EnsureDayButtons();
 
-        MonthTitle.Text = _visibleMonth.ToString("yyyy 年 M 月", CultureInfo.GetCultureInfo("zh-CN"));
+        UpdateMonthTitle();
         MonthTitle.Foreground = TextBrush(_settings.TextOpacity);
 
         var startDate = _visibleMonth.AddDays(-GetFirstDayOffset(_visibleMonth));

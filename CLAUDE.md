@@ -39,7 +39,7 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 | 文件 | 职责 |
 |---|---|
-| `MainWindow.xaml.cs` | 字段、构造、`ApplySettings`、模式切换与搜索、画刷/阴影缓存 |
+| `MainWindow.xaml.cs` | 字段、构造、`ApplySettings`、模式切换与搜索、顶栏窄窗口降级、画刷/阴影缓存 |
 | `MainWindow.Calendar.cs` | 周头、42 个日期格、今日块、日期编辑器、农历/假日角标 |
 | `MainWindow.List.cs` | 「待做」列表：单次遍历分桶 + 逾期/今天/未来分组渲染 |
 | `MainWindow.Notes.cs` | 网页笔记：接收推送、卡片渲染、编辑器 CRUD |
@@ -51,13 +51,33 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 它同时持有设置、全部日历渲染、托盘图标、HTTP 笔记监听服务和 Win32 P/Invoke。没有 MVVM、没有 ViewModel，几乎不用数据绑定：`RenderCalendar()` 清空 `CalendarGrid`，然后以命令式方式重建全部 42 个日期按钮（`CreateDayButton` → `CreateDayContent`）。唯一例外是 `DayEditorWindow`，它绑定了 `ObservableCollection<TodoItem>`。
 
-由此带来的后果：改动视觉效果通常要动**两处** —— `ApplySettings()`（从 `AppSettings` 推导颜色、透明度、字号）和对应的 `Render*` 方法。`MainWindow.xaml` 里写死的 `Background="#50181818"` 之类只是启动时的兜底值，`ApplySettings()` 会在运行时按 `BackgroundOpacity` 覆盖 `ModeSidebar` / `MainContentPanel` / `HeaderBar` 的背景。
+由此带来的后果：改动视觉效果通常要动**两处** —— `ApplySettings()`（从 `AppSettings` 推导颜色、透明度、字号）和对应的 `Render*` 方法。`MainWindow.xaml` 里写死的 `Background="#50181818"` 之类只是启动时的兜底值，`ApplySettings()` 会在运行时按 `BackgroundOpacity` 覆盖 `AppSurface` 的背景（整个界面只有这一块表面上色）。
 
 ### 三种视图模式共用一块内容区
 
 `CalendarViewPanel`、`ListViewPanel`、`WebNoteViewPanel` 靠 `Visibility` 切换，由单一字段 `_mode`（`ViewMode.Calendar/List/Note`）跟踪 —— 统一走 `SetMode()`，它负责 Visibility、`UpdateModeButtons()` 和 `RefreshCurrentView()`。
 
-搜索是"在当前模式内过滤"：只有从月历开始搜索才自动切到列表（并把原模式记进 `_modeBeforeSearch`，清空时回去）；已经在列表/笔记里就地过滤。用户手动点侧边栏按钮会清掉 `_modeBeforeSearch`。搜索输入有 200ms 防抖。
+搜索是"在当前模式内过滤"：只有从月历开始搜索才自动切到列表（并把原模式记进 `_modeBeforeSearch`，清空时回去）；已经在列表/笔记里就地过滤。用户手动点模式按钮会清掉 `_modeBeforeSearch`。搜索输入有 200ms 防抖。
+
+搜索条**平时是收起的**（`SearchOverlay`，`Visibility=Collapsed`）：点顶栏放大镜或 `Ctrl+F` 展开并盖住顶栏内容，`Esc` 或 ✕ 收起。收起时会清空搜索词，正好触发上面那条"清空后退回原模式"的逻辑。**不要把它改回常驻一行** —— 十次里有九次用不到，却要占 38px。
+
+### 顶栏承载全部"操作外壳"
+
+月份导航（`MonthNavGroup`）、模式分段（`ModeSegment`）、搜索、设置、关闭全在 `HeaderBar` 一行里。原先它们散在三处：顶栏一行、左侧栏一列 68px、搜索一行 38px，而侧栏三个按钮只占顶部 186px，底下约 560px 是空的。**左侧栏已删除**，连带 `SidebarPosition` 设置项一起。
+
+顶栏的控件语言只有两种，别加第三种：
+
+- **`GhostButtonStyle`** —— 无底、无描边，hover / 键盘焦点时才浮现 `#1AFFFFFF`。界面是**单层**半透明表面，按钮再各自带底色与白描边就是"盒子套盒子"的回潮（那正是重构前难看的根源）。
+- **`SegmentButtonStyle`** —— 三个模式共享一个胶囊底，选中项是一块实心滑块（`ModeSelectedBrush`）。它表达"三选一"，与幽灵按钮的"点一下做件事"是两回事。
+
+`‹ ›` 箭头贴着月份标题成一组，不是三个分离的方块；非月历模式下整组隐藏（待做与笔记跟"看哪个月"无关）。
+
+**窄窗口降级**：窗口可拖到 480px，WPF 没有媒体查询，只能在 `MainWindow_SizeChanged` 里按 `ActualWidth` 分三档（`ApplyHeaderDensity`）——
+- ≥560：`2026年8月` + `月历 待做 笔记`
+- 500~560：标题只留 `8月`（年份翻月时基本不变，冗余度最高）
+- <500：模式按钮收成单字 `历 做 记`（**不用图标**：三个都是抽象概念，小尺寸图标反而要猜；全称在 ToolTip 里）
+
+只在跨档时才改文本，否则每次 `SizeChanged` 都白白触发一轮布局；首次布局前 `ActualWidth` 是 0，那时要退回 `_settings.Width` 判断，不然窄档会误判。
 
 ### 设置的往返流程
 
@@ -138,7 +158,7 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 ### 字符串字面量带有语义
 
-`TodoItem.Priority` 是按序数与 `"重要"` 比较的（`CalendarQuery.IsImportantTodo`），默认值 `"普通"` —— 它们是数据而非展示文案，改动会让已有的 `calendar-data.json` 失效。同理 `ThemePreset` 的名字是 `Models/ThemePresets.All` 的键（预设同时决定文字颜色、不透明度、阴影强度和面板底色），`SidebarPosition` 存 `"Left"`/`"Right"`、`WindowLayer` 存 `"Bottom"`/`"Normal"`/`"Top"`/`"Desktop"`，而下拉框显示的是中文。
+`TodoItem.Priority` 是按序数与 `"重要"` 比较的（`CalendarQuery.IsImportantTodo`），默认值 `"普通"` —— 它们是数据而非展示文案，改动会让已有的 `calendar-data.json` 失效。同理 `ThemePreset` 的名字是 `Models/ThemePresets.All` 的键（预设同时决定文字颜色、不透明度、阴影强度和面板底色），`WindowLayer` 存 `"Bottom"`/`"Normal"`/`"Top"`/`"Desktop"`，而下拉框显示的是中文。（`SidebarPosition` 已废弃：侧栏没了，字段只为兼容老 JSON 而保留，没有代码读它 —— 删字段会让反序列化失败并触发文件隔离。）
 
 **`AppSettings` 里用于迁移判断的字段默认值必须留空**：`WindowLayer` 的默认值是 `string.Empty` 而不是 `"Normal"`，否则 `Normalize()` 会把"字段缺失"误判成"已是合法值"，老用户的设置就被静默丢弃了（这个 bug 是被单元测试抓出来的）。
 

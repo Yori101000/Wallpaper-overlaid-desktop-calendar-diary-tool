@@ -11,6 +11,7 @@
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False"
+        SizeChanged="MainWindow_SizeChanged"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
         FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Variable">
@@ -76,41 +77,48 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="NavButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#18FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#2AFFFFFF"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="0"/>
+        <!--
+            顶栏的控件语言只有两种，别再往里加第三种：
+
+            1) GhostButtonStyle —— 无底、无描边，只有文字或字形；hover 才浮现一块底。
+               界面早已是**单层**半透明表面，按钮再各自带底色与白描边就是"盒子套盒子"的回潮，
+               一排灰方块压在玻璃上正是之前难看的根源。
+            2) SegmentButtonStyle —— 三个视图模式共享一个胶囊底，选中项是一块实心滑块。
+               它表达的是"三选一"，与幽灵按钮表达的"点一下做件事"是两回事。
+        -->
+        <Style x:Key="GhostButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0"/>
             <Setter Property="Margin" Value="0"/>
+            <Setter Property="Height" Value="28"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="7">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <!-- 原先 hover 也设成 #18FFFFFF，与默认 Setter 完全相同 ——
-                                 等于这排按钮根本没有悬停反馈。必须比默认值更亮。 -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#2EFFFFFF"/>
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#55FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#44FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#2EFFFFFF"/>
+                            </Trigger>
+                            <!-- 键盘可达：Tab 走到时必须看得见，幽灵按钮平时没有边界 -->
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -118,38 +126,35 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SidebarModeButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="54"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="Padding" Value="4"/>
-            <Setter Property="Background" Value="#18FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#2AFFFFFF"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="13"/>
+        <Style x:Key="SegmentButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Height" Value="22"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
+                        <!-- 滑块用 Background 承载：选中态由 UpdateModeButtons 赋值，
+                             未选中是 Transparent，胶囊底由外层 Border 统一提供。 -->
                         <Border x:Name="Chrome"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              TextElement.Foreground="{TemplateBinding Foreground}"
-                                              RecognizesAccessKey="True"/>
+                                CornerRadius="6">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#2AFFFFFF"/>
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#55FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.82"/>
                             </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#40FFFFFF"/>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -265,70 +270,90 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-        <Border x:Name="HeaderBar"
-                Padding="12,10,12,6">
-            <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <Button x:Name="PrevMonthBtn" Content="‹" Width="28" Height="28" Click="PreviousMonth_Click" Style="{StaticResource NavButtonStyle}" ToolTip="上一月（←）"/>
-                    <TextBlock x:Name="MonthTitle" Margin="10,0" MinWidth="120" TextAlignment="Center" VerticalAlignment="Center" FontWeight="Light" FontSize="20"/>
-                    <Button x:Name="NextMonthBtn" Content="›" Width="28" Height="28" Click="NextMonth_Click" Style="{StaticResource NavButtonStyle}" ToolTip="下一月（→）"/>
-                    <Button x:Name="TodayBtn" Content="今天" MinWidth="44" Height="28" Margin="8,0,0,0" Click="Today_Click" Style="{StaticResource NavButtonStyle}" FontSize="13" ToolTip="回到今天（T）"/>
-                </StackPanel>
+        <!--
+            顶栏一行承载全部"操作外壳"：左边是内容相关的月份导航，右边是模式切换与窗口操作。
+            原先它们散在三处（顶栏一行、左侧栏一列 68px、搜索一行 38px），侧栏还有 ~560px
+            是空的。合并之后内容区从上到下只剩今日块 / 周头 / 月历三层。
+        -->
+        <Border x:Name="HeaderBar" Padding="10,8,10,6">
+            <Grid>
+                <DockPanel x:Name="HeaderContent">
+                    <!-- 月份导航：箭头贴着标题左右两侧成一组，不再是三个分离的方块。
+                         非月历模式下整组隐藏 —— 待做与笔记跟月份无关。 -->
+                    <StackPanel x:Name="MonthNavGroup" Orientation="Horizontal" DockPanel.Dock="Left">
+                        <Button x:Name="PrevMonthBtn" Content="‹" Width="24" FontSize="17"
+                                Padding="0" Click="PreviousMonth_Click"
+                                Style="{StaticResource GhostButtonStyle}" ToolTip="上一月（←）"/>
+                        <TextBlock x:Name="MonthTitle" Margin="2,0" VerticalAlignment="Center"
+                                   FontWeight="Light" FontSize="21"/>
+                        <Button x:Name="NextMonthBtn" Content="›" Width="24" FontSize="17"
+                                Padding="0" Click="NextMonth_Click"
+                                Style="{StaticResource GhostButtonStyle}" ToolTip="下一月（→）"/>
+                        <Button x:Name="TodayBtn" Content="今天" Margin="4,0,0,0" Click="Today_Click"
+                                Style="{StaticResource GhostButtonStyle}" ToolTip="回到今天（T）"/>
+                    </StackPanel>
 
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    <Button x:Name="SettingsBtn" Content="设置" MinWidth="44" Height="28" Click="Settings_Click" Style="{StaticResource NavButtonStyle}" FontSize="13"/>
-                    <Button x:Name="CloseBtn" Content="×" Width="28" Height="28" Margin="4,0,0,0" Click="Close_Click" Style="{StaticResource NavButtonStyle}"/>
-                </StackPanel>
-            </DockPanel>
-        </Border>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                        <!-- 分段控件：三个模式共享一个胶囊底，选中项是实心滑块 -->
+                        <!-- 胶囊只留一层极淡的底、不加描边：它是"三选一"的容器，
+                             不该比顶栏上任何一个文字都重。 -->
+                        <Border x:Name="ModeSegment" CornerRadius="7" Padding="2"
+                                Margin="0,0,10,0"
+                                Background="#12FFFFFF"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <!-- 窄窗口下文字会被 UpdateModeButtonLabels 收成单字，
+                                     全称留在 ToolTip 里。 -->
+                                <Button x:Name="CalendarModeButton" Content="月历" ToolTip="月历"
+                                        Style="{StaticResource SegmentButtonStyle}" Click="CalendarMode_Click"/>
+                                <Button x:Name="ListModeButton" Content="待做" ToolTip="待做"
+                                        Style="{StaticResource SegmentButtonStyle}" Click="ListMode_Click"/>
+                                <Button x:Name="NoteModeButton" Content="笔记" ToolTip="笔记"
+                                        Style="{StaticResource SegmentButtonStyle}" Click="NoteMode_Click"/>
+                            </StackPanel>
+                        </Border>
 
-        <Grid x:Name="BodyGrid" Grid.Row="1" Margin="12,0,12,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LeftSidebarColumn" Width="68"/>
-                <ColumnDefinition x:Name="MainContentColumn" Width="*"/>
-                <ColumnDefinition x:Name="RightSidebarColumn" Width="0"/>
-            </Grid.ColumnDefinitions>
+                        <Button x:Name="SearchToggleBtn" Width="28" Padding="0"
+                                Click="SearchToggle_Click" Style="{StaticResource GhostButtonStyle}"
+                                ToolTip="搜索（Ctrl+F）">
+                            <!-- 放大镜用矢量画，不依赖任何图标字体 -->
+                            <Canvas Width="14" Height="14">
+                                <Ellipse Width="10" Height="10" Canvas.Left="0" Canvas.Top="0"
+                                         Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                         StrokeThickness="1.4"/>
+                                <Line X1="9" Y1="9" X2="13.2" Y2="13.2"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Button>
+                        <Button x:Name="SettingsBtn" Content="设置" Click="Settings_Click"
+                                Style="{StaticResource GhostButtonStyle}"/>
+                        <!-- ✕ 与「设置」之间拉开一段：它是这一行里唯一"点错就得重开"的按钮 -->
+                        <Button x:Name="CloseBtn" Content="✕" Width="28" Margin="10,0,0,0" Padding="0"
+                                FontSize="13" Click="Close_Click" Style="{StaticResource GhostButtonStyle}"
+                                ToolTip="关闭（Esc）"/>
+                    </StackPanel>
+                </DockPanel>
 
-            <Border x:Name="ModeSidebar"
-                    Grid.Column="0"
-                    Margin="0,0,12,0">
-                <StackPanel>
-                    <Button x:Name="CalendarModeButton"
-                            Content="月历"
-                            Style="{StaticResource SidebarModeButtonStyle}"
-                            Click="CalendarMode_Click"/>
-                    <Button x:Name="ListModeButton"
-                            Content="待做"
-                            Style="{StaticResource SidebarModeButtonStyle}"
-                            Click="ListMode_Click"/>
-                    <Button x:Name="NoteModeButton"
-                            Content="笔记"
-                            Style="{StaticResource SidebarModeButtonStyle}"
-                            Click="NoteMode_Click"/>
-                </StackPanel>
-            </Border>
-
-            <Border x:Name="MainContentPanel"
-                    Grid.Column="1">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="True">
-                        <TextBlock Text="搜索"
-                                   Margin="0,0,8,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="#CCFFFFFF"/>
-                        <TextBox x:Name="SearchTextBox"
-                                 Height="30"
-                                 MinWidth="180"
+                <!-- 搜索条：平时收起，展开时整条盖住顶栏。十次里有九次用不到，
+                     不该常年占一整行。Ctrl+F 或点放大镜展开，Esc 收起。 -->
+                <Border x:Name="SearchOverlay" Visibility="Collapsed"
+                        Background="Transparent" VerticalAlignment="Center">
+                    <DockPanel LastChildFill="True">
+                        <Button x:Name="SearchCloseBtn" Content="✕" Width="28" Padding="0" FontSize="13"
+                                DockPanel.Dock="Right" Margin="6,0,0,0" Click="SearchToggle_Click"
+                                Style="{StaticResource GhostButtonStyle}" ToolTip="收起搜索（Esc）"/>
+                        <TextBox x:Name="SearchTextBox" Height="30"
                                  Style="{StaticResource OverlayTextBoxStyle}"
                                  TextChanged="SearchTextBox_TextChanged"/>
                     </DockPanel>
+                </Border>
+            </Grid>
+        </Border>
 
-                    <Grid Grid.Row="1">
+        <Grid x:Name="BodyGrid" Grid.Row="1" Margin="12,0,12,10">
+            <Border x:Name="MainContentPanel">
+                    <Grid>
                         <!-- 底色与边框已上移到 MainContentPanel 单层承载：原先这里再叠一层
                              #22181818 + 白边，实际黑度 ≈40%，比设置里的「背景透明度」更闷。 -->
                         <Border x:Name="CalendarViewPanel"
@@ -340,7 +365,9 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <UniformGrid x:Name="WeekHeaderGrid" Grid.Row="0" Columns="7" Margin="2,0,2,4"/>
+                                <!-- 周头是月历表格的列头，必须紧贴月历。原先它排在今日块**上面**，
+                                     中间隔着一整块内容，列头与它标注的表格断开了。 -->
+                                <UniformGrid x:Name="WeekHeaderGrid" Grid.Row="1" Columns="7" Margin="2,0,2,4"/>
 
                                 <!--
                                     今日块。「今天」的识别任务从日期格搬到了这里 ——
@@ -349,17 +376,19 @@
                                     用提亮而非再压黑一层，避免与主面板叠加。
                                 -->
                                 <Border x:Name="TodayPanel"
-                                        Grid.Row="1"
-                                        Margin="0,0,0,8"
+                                        Grid.Row="0"
+                                        Margin="0,0,0,10"
                                         Padding="12,8"
                                         CornerRadius="9"
                                         Background="#14FFFFFF">
                                     <StackPanel>
                                         <Grid>
+                                            <!-- 计数/提示紧跟在日期块右边（第 2 列 Auto），最后一列吸收余量。
+                                                 原先它靠在最右缘，窗口一宽就与它描述的那个大号日号断开了。 -->
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
 
                                             <TextBlock x:Name="TodayDayNumber"
@@ -393,6 +422,7 @@
 
                                             <TextBlock x:Name="TodayTodoTitle"
                                                        Grid.Column="2"
+                                                       HorizontalAlignment="Left"
                                                        VerticalAlignment="Center"
                                                        FontWeight="Normal"/>
                                         </Grid>
@@ -522,7 +552,6 @@
                             </Grid>
                         </Border>
                     </Grid>
-                </Grid>
             </Border>
         </Grid>
             </Grid>

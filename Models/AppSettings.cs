@@ -29,6 +29,11 @@ public sealed class AppSettings
     public double TextOpacity { get; set; } = 0.9;
     public double FontSize { get; set; } = 28;
     public string ThemePreset { get; set; } = "清晰白";
+    /// <summary>
+    /// 已废弃：左侧栏在顶栏重构后不复存在，模式切换搬进了顶栏的分段控件。
+    /// 字段保留只为让老的 settings.json 仍能解析（删字段会让反序列化失败并触发文件隔离），
+    /// 没有任何代码读它，也不再出现在设置窗口里。
+    /// </summary>
     public string SidebarPosition { get; set; } = "Left";
     public string TextColor { get; set; } = "#FFFFFFFF";
     public bool IsLocked { get; set; }

@@ -16,9 +16,6 @@ namespace TransparentCalendar.Views;
 
 public partial class SettingsWindow : Window
 {
-    private const string SidebarPositionLeft = "Left";
-    private const string SidebarPositionRight = "Right";
-
     private readonly StorageService _storage;
     private readonly StartupService _startup = new();
     private readonly Dictionary<string, CalendarEntry> _entries;
@@ -75,7 +72,6 @@ public partial class SettingsWindow : Window
         Settings.TextOpacity = OpacitySlider.Value;
         Settings.FontSize = FontSizeSlider.Value;
         Settings.ThemePreset = GetSelectedThemePreset();
-        Settings.SidebarPosition = GetSelectedSidebarPosition();
         Settings.TextColor = string.IsNullOrWhiteSpace(ColorText.Text) ? "#FFFFFFFF" : ColorText.Text.Trim();
         Settings.IsLocked = LockWindowCheck.IsChecked == true;
         Settings.StartWithMonday = MondayStartCheck.IsChecked == true;
@@ -279,7 +275,6 @@ public partial class SettingsWindow : Window
             FontSizeSlider.Value = Settings.FontSize;
             ColorText.Text = Settings.TextColor;
             SelectThemePreset(Settings.ThemePreset, Settings.TextColor);
-            SelectSidebarPosition(Settings.SidebarPosition);
             SelectWindowLayer(Settings.WindowLayer);
             LockWindowCheck.IsChecked = Settings.IsLocked;
             MondayStartCheck.IsChecked = Settings.StartWithMonday;
@@ -311,19 +306,6 @@ public partial class SettingsWindow : Window
     private string GetSelectedThemePreset()
     {
         return GetSelectedComboItem(ThemePresetCombo) ?? ThemePresets.Custom;
-    }
-
-    private void SelectSidebarPosition(string position)
-    {
-        var selectedText = string.Equals(position, SidebarPositionRight, StringComparison.Ordinal) ? "右侧" : "左侧";
-        SelectComboItem(SidebarPositionCombo, selectedText);
-    }
-
-    private string GetSelectedSidebarPosition()
-    {
-        return string.Equals(GetSelectedComboItem(SidebarPositionCombo), "右侧", StringComparison.Ordinal)
-            ? SidebarPositionRight
-            : SidebarPositionLeft;
     }
 
     private void SelectWindowLayer(string layer)

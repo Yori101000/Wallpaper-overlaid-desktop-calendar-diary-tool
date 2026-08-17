@@ -44,9 +44,14 @@ public partial class MainWindow : Window
     private const int SwpNoZOrder = 0x0004;
     private const int SwpNoActivate = 0x0010;
     private const int SwpFrameChanged = 0x0020;
-    private const string SidebarPositionRight = "Right";
-    private const double SidebarWidth = 68;
     private const int DayCellCount = 42;
+
+    // ── 顶栏的窄窗口降级 ──
+    // 顶栏一行要塞下月份导航、今天、三个模式、搜索、设置、关闭，窗口可以被拖到 480px。
+    // WPF 没有媒体查询，只能按 ActualWidth 分档。降级顺序是刻意的：**先砍标题的年份**
+    // （信息冗余度最高，翻月份时年份基本不变），再砍模式按钮的文字。
+    private const double CompactTitleWidth = 560;
+    private const double CompactAllWidth = 500;
     private const int SearchDebounceMs = 200;
     private const int UrgencyGroupPreviewCount = 10;
     private const double AdjacentMonthOpacity = 0.28;
@@ -86,10 +91,8 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush DeleteButtonBorderBrush = CreateFrozenBrush(60, 239, 71, 111);
     private static readonly SolidColorBrush ActionButtonBrush = CreateFrozenBrush(24, 255, 255, 255);
     private static readonly SolidColorBrush ActionButtonBorderBrush = CreateFrozenBrush(40, 255, 255, 255);
-    private static readonly SolidColorBrush ModeSelectedBrush = CreateFrozenBrush(70, 255, 255, 255);
-    private static readonly SolidColorBrush ModeIdleBrush = CreateFrozenBrush(24, 255, 255, 255);
-    private static readonly SolidColorBrush ModeSelectedBorderBrush = CreateFrozenBrush(95, 255, 255, 255);
-    private static readonly SolidColorBrush ModeIdleBorderBrush = CreateFrozenBrush(42, 255, 255, 255);
+    /// <summary>分段控件里"选中"那一格的滑块。未选中项没有底色，胶囊底由外层统一提供。</summary>
+    private static readonly SolidColorBrush ModeSelectedBrush = CreateFrozenBrush(56, 255, 255, 255);
     // ── 通道一：日期数字的颜色 = 法定属性 ──
     // 存成十六进制串而不是冻结画刷，好让 GetBrush 把透明度也算进缓存键 ——
     // 非本月的放假/调休需要同时降透明度。
@@ -287,8 +290,11 @@ public partial class MainWindow : Window
             CloseBtn.Foreground = brush;
         }
 
-        ApplySidebarPosition();
         UpdateModeButtons();
+
+        // 窄窗口启动时 SizeChanged 未必来得比这里早，这里先按当前宽度定一次档。
+        ApplyHeaderDensity();
+        UpdateModeButtonLabels();
         RenderWeekHeader();
     }
 
@@ -397,13 +403,73 @@ public partial class MainWindow : Window
         RefreshCurrentView();
     }
 
-    private void ApplySidebarPosition()
+    /// <summary>顶栏的拥挤程度。三档，越靠后砍得越多。</summary>
+    private enum HeaderDensity
     {
-        var isRight = string.Equals(_settings.SidebarPosition, SidebarPositionRight, StringComparison.Ordinal);
-        LeftSidebarColumn.Width = isRight ? new GridLength(0) : new GridLength(SidebarWidth);
-        RightSidebarColumn.Width = isRight ? new GridLength(SidebarWidth) : new GridLength(0);
-        Grid.SetColumn(ModeSidebar, isRight ? 2 : 0);
-        ModeSidebar.Margin = isRight ? new Thickness(10, 0, 0, 0) : new Thickness(0, 0, 10, 0);
+        /// <summary>「2026年8月」+「月历 待做 笔记」。</summary>
+        Full,
+
+        /// <summary>标题只留「8月」。</summary>
+        CompactTitle,
+
+        /// <summary>模式按钮再收成单字。</summary>
+        CompactAll
+    }
+
+    private HeaderDensity _headerDensity = HeaderDensity.Full;
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            ApplyHeaderDensity();
+        }
+    }
+
+    private void ApplyHeaderDensity()
+    {
+        // 首次布局之前 ActualWidth 还是 0，那时按设置里的宽度算，否则会误判成最窄档。
+        var width = ActualWidth > 0 ? ActualWidth : _settings.Width;
+
+        var density = width < CompactAllWidth
+            ? HeaderDensity.CompactAll
+            : width < CompactTitleWidth
+                ? HeaderDensity.CompactTitle
+                : HeaderDensity.Full;
+
+        // 每次 SizeChanged 都改 Text 会白白触发一轮布局，只在真正跨档时动。
+        if (density == _headerDensity)
+        {
+            return;
+        }
+
+        _headerDensity = density;
+        UpdateMonthTitle();
+        UpdateModeButtonLabels();
+    }
+
+    /// <summary>
+    /// 月份标题。中文排版不加空格：「2026 年 8 月」在 21px Light 下会散得很开。
+    /// 窄窗口下只留「8月」—— 年份在翻月时基本不变，是这一行里冗余度最高的信息。
+    /// </summary>
+    private void UpdateMonthTitle()
+    {
+        MonthTitle.Text = _visibleMonth.ToString(
+            _headerDensity == HeaderDensity.Full ? "yyyy年M月" : "M月",
+            CultureInfo.GetCultureInfo("zh-CN"));
+    }
+
+    /// <summary>
+    /// 最窄那一档把模式按钮收成单字。
+    /// 没有换成图标：月历 / 待做 / 笔记都是抽象概念，小尺寸下的图标反而要猜，
+    /// 而单字仍然直接可读；全称保留在 ToolTip 里。
+    /// </summary>
+    private void UpdateModeButtonLabels()
+    {
+        var compact = _headerDensity == HeaderDensity.CompactAll;
+        CalendarModeButton.Content = compact ? "历" : "月历";
+        ListModeButton.Content = compact ? "做" : "待做";
+        NoteModeButton.Content = compact ? "记" : "笔记";
     }
 
     private void UpdateModeButtons()
@@ -411,14 +477,50 @@ public partial class MainWindow : Window
         SetModeButtonSelected(CalendarModeButton, _mode == ViewMode.Calendar);
         SetModeButtonSelected(ListModeButton, _mode == ViewMode.List);
         SetModeButtonSelected(NoteModeButton, _mode == ViewMode.Note);
+
+        // 月份导航只在月历模式下有意义：待做与笔记跟"看哪个月"无关，
+        // 留着它们只是让顶栏更挤。
+        MonthNavGroup.Visibility = _mode == ViewMode.Calendar ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// 分段控件的选中态：只靠一块实心滑块 + 字重，未选中项完全无底 ——
+    /// 胶囊底由外层 <c>ModeSegment</c> 统一提供，每个按钮不再各自带底色与描边。
+    /// </summary>
     private static void SetModeButtonSelected(WpfButton button, bool isSelected)
     {
-        button.Opacity = isSelected ? 1 : 0.72;
+        button.Opacity = isSelected ? 1 : 0.62;
         button.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal;
-        button.Background = isSelected ? ModeSelectedBrush : ModeIdleBrush;
-        button.BorderBrush = isSelected ? ModeSelectedBorderBrush : ModeIdleBorderBrush;
+        button.Background = isSelected ? ModeSelectedBrush : WpfBrushes.Transparent;
+    }
+
+    /// <summary>
+    /// 展开 / 收起搜索条。它平时是收起的（十次里有九次用不到），展开时整条盖住顶栏。
+    /// 收起时会清空搜索词，好让 <see cref="ApplySearch"/> 把视图退回搜索前的模式。
+    /// </summary>
+    private void ToggleSearchBar(bool show)
+    {
+        SearchOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        HeaderContent.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+
+        if (show)
+        {
+            SearchTextBox.Focus();
+            SearchTextBox.SelectAll();
+            return;
+        }
+
+        if (SearchTextBox.Text.Length > 0)
+        {
+            SearchTextBox.Text = string.Empty;
+        }
+
+        Keyboard.ClearFocus();
+    }
+
+    private void SearchToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleSearchBar(SearchOverlay.Visibility != Visibility.Visible);
     }
 
     private double ScaledFont(double ratio, double minimum = 12)

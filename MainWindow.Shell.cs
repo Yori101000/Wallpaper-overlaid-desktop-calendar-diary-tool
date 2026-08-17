@@ -126,11 +126,10 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Escape)
         {
-            // 搜索框里按 Esc 先清空搜索，再按才收起窗口。
-            if (!string.IsNullOrEmpty(SearchTextBox.Text))
+            // Esc 的优先级：先收起搜索条（顺带清空搜索词并退回原模式），再考虑收窗口。
+            if (SearchOverlay.Visibility == Visibility.Visible)
             {
-                SearchTextBox.Text = string.Empty;
-                Keyboard.ClearFocus();
+                ToggleSearchBar(false);
                 e.Handled = true;
                 return;
             }
@@ -146,8 +145,7 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
         {
-            SearchTextBox.Focus();
-            SearchTextBox.SelectAll();
+            ToggleSearchBar(true);
             e.Handled = true;
             return;
         }
