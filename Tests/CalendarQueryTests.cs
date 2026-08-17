@@ -335,12 +335,27 @@ public class WeekendDividerTests
     // ── 今日块的文案 ──────────────────────────────────────────────
 
     [Theory]
-    [InlineData(2026, 8, 14, "8月14日 · 周五")]
-    [InlineData(2026, 1, 4, "1月4日 · 周日")]
-    [InlineData(2026, 10, 1, "10月1日 · 周四")]
-    public void 今日块日期行(int year, int month, int day, string expected)
+    [InlineData(2026, 8, 14, "周五")]
+    [InlineData(2026, 1, 4, "周日")]
+    [InlineData(2026, 10, 1, "周四")]
+    public void 今日块日期行_浏览当月时只给星期(int year, int month, int day, string expected)
     {
-        Assert.Equal(expected, BuildTodayDateLine(new DateTime(year, month, day)));
+        var today = new DateTime(year, month, day);
+        var visibleMonth = new DateTime(year, month, 1);
+        Assert.Equal(expected, BuildTodayDateLine(today, visibleMonth));
+    }
+
+    /// <summary>
+    /// 翻到别的月份时必须补回月日：那时屏幕上再没有别处写着今天是几月几号，
+    /// 只剩今日块里一个孤零零的大号数字。
+    /// </summary>
+    [Theory]
+    [InlineData(2026, 12, 1, "8月14日 · 周五")]  // 同年不同月
+    [InlineData(2027, 8, 1, "8月14日 · 周五")]   // 同月不同年
+    public void 今日块日期行_翻到别的月份时补回月日(int visibleYear, int visibleMonth, int visibleDay, string expected)
+    {
+        var today = new DateTime(2026, 8, 14);
+        Assert.Equal(expected, BuildTodayDateLine(today, new DateTime(visibleYear, visibleMonth, visibleDay)));
     }
 
     [Fact]

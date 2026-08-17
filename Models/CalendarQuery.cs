@@ -123,10 +123,20 @@ public static class CalendarQuery
     /// <summary>用「周五」而不是 <c>dddd</c> 的「星期五」—— 短一截，今日块那一行才排得开。</summary>
     private static readonly string[] WeekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
-    /// <summary>今日块第一行：<c>8月14日 · 周五</c>。</summary>
-    public static string BuildTodayDateLine(DateTime date)
+    /// <summary>
+    /// 今日块第一行。
+    ///
+    /// 浏览的正是当月时只给星期（<c>周一</c>）—— 大号日号已经说了"日"，顶栏说了"年月"，
+    /// 再写一遍 <c>8月17日</c> 就是同一块里说三遍。
+    ///
+    /// 翻到别的月份时补回月日（<c>8月17日 · 周一</c>）：那时屏幕上再没有别处告诉你今天是几月几号，
+    /// 只剩一个孤零零的大号数字，容易被读成"你正在看的那个月的 17 号"。
+    /// </summary>
+    public static string BuildTodayDateLine(DateTime today, DateTime visibleMonth)
     {
-        return $"{date.Month}月{date.Day}日 · {WeekdayNames[(int)date.DayOfWeek]}";
+        var weekday = WeekdayNames[(int)today.DayOfWeek];
+        var browsingThisMonth = visibleMonth.Year == today.Year && visibleMonth.Month == today.Month;
+        return browsingThisMonth ? weekday : $"{today.Month}月{today.Day}日 · {weekday}";
     }
 
     /// <summary>今日块第二行：<c>农历六月廿二 · 立秋</c>。节日与节气存在时依次追加。</summary>

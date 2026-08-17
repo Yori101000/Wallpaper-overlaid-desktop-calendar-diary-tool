@@ -51,7 +51,9 @@ public partial class MainWindow : Window
             WeekHeaderGrid.Children.Add(new TextBlock
             {
                 Text = days[i],
-                Foreground = TextBrush(_settings.TextOpacity * (isWeekend ? 0.58 : 0.42)),
+                // 周头原先压到 0.42/0.58，比它下面的农历行还淡 —— 层级反了。
+                // 它是读懂整张表的钥匙，必须比格子里的次要信息更清楚。
+                Foreground = TextBrush(_settings.TextOpacity * (isWeekend ? 0.86 : 0.68)),
                 FontSize = WeekHeaderFontSize,
                 HorizontalAlignment = WpfHorizontalAlignment.Center,
                 VerticalAlignment = WpfVerticalAlignment.Center,
@@ -233,14 +235,18 @@ public partial class MainWindow : Window
         content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(MarkerRowHeight) });
         content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
+        // 「今天」靠**字号 + 字重 + 满亮度**跳出来，不加任何装饰。
+        // 一屏 42 个数字里只靠加粗是找不到的（实测），而放大一档不占新空间：
+        // 数字行是定高的，字号变化不会顶动农历行，也不会让整行基线参差。
         var dayNumber = new TextBlock
         {
             Text = date.Day.ToString(CultureInfo.InvariantCulture),
-            FontSize = _settings.FontSize,
+            FontSize = isToday ? _settings.FontSize * TodayNumberScale : _settings.FontSize,
             FontWeight = isToday ? FontWeights.Bold : FontWeights.Medium,
             Foreground = numberBrush,
             HorizontalAlignment = WpfHorizontalAlignment.Center,
             VerticalAlignment = WpfVerticalAlignment.Center,
+            // LineHeight 恒按**普通字号**算：今天放大一档也不能顶动农历行的位置。
             LineHeight = _settings.FontSize * 1.1,
             LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
             Effect = OptionalTextShadow(opacity)
@@ -419,7 +425,7 @@ public partial class MainWindow : Window
         TodayDayNumber.Foreground = TextBrush(Math.Min(1, opacity + 0.08));
         TodayDayNumber.Effect = OptionalTextShadow(opacity);
 
-        TodayDateLine.Text = BuildTodayDateLine(today);
+        TodayDateLine.Text = BuildTodayDateLine(today, _visibleMonth);
         TodayDateLine.FontSize = ScaledFont(FontScale.TodayMeta);
         TodayDateLine.Foreground = TextBrush(opacity);
         TodayDateLine.Effect = OptionalTextShadow(opacity * 0.7);
@@ -479,17 +485,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 摘要与计数排在同一行，装不下就裁剪 —— 今日块只占一行，不再向下长。
         foreach (var todo in unfinishedTodos.Take(TodayTodoPreviewCount))
         {
             var isImportant = IsImportantTodo(todo);
             TodayTodoItems.Children.Add(new TextBlock
             {
                 Text = BuildTodayTodoText(todo, isImportant),
-                Foreground = isImportant ? ImportantMarkerBrush : TextBrush(_settings.TextOpacity),
-                FontSize = ScaledFont(FontScale.Body),
-                Margin = new Thickness(0, 0, 12, 2),
+                Foreground = isImportant ? ImportantMarkerBrush : TextBrush(opacity * 0.92),
+                FontSize = ScaledFont(FontScale.TodayMeta),
+                Margin = new Thickness(0, 0, 14, 0),
                 VerticalAlignment = WpfVerticalAlignment.Center,
-                Effect = OptionalTextShadow(_settings.TextOpacity * 0.7)
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Effect = OptionalTextShadow(opacity * 0.7)
             });
         }
 
@@ -497,12 +505,11 @@ public partial class MainWindow : Window
         {
             TodayTodoItems.Children.Add(new TextBlock
             {
-                Text = $"还有 {unfinishedTodos.Count - TodayTodoPreviewCount} 项",
-                Foreground = TextBrush(_settings.TextOpacity * 0.8),
-                FontSize = ScaledFont(FontScale.Body),
-                Margin = new Thickness(0, 0, 12, 2),
+                Text = $"+{unfinishedTodos.Count - TodayTodoPreviewCount}",
+                Foreground = TextBrush(opacity * 0.6),
+                FontSize = ScaledFont(FontScale.TodayMeta),
                 VerticalAlignment = WpfVerticalAlignment.Center,
-                Effect = OptionalTextShadow(_settings.TextOpacity * 0.7)
+                Effect = OptionalTextShadow(opacity * 0.7)
             });
         }
     }
@@ -592,6 +599,22 @@ public partial class MainWindow : Window
     private void Today_Click(object sender, RoutedEventArgs e)
     {
         GoToToday();
+    }
+
+    /// <summary>
+    /// 滚轮翻月。顶栏去掉 ‹ › 之后，这里和 <c>←</c> <c>→</c> 是翻月的全部入口，
+    /// 所以别把它挂到别的面板上，也别在这里加节流 —— 一次滚动只翻一个月，跟用户的手一致。
+    /// </summary>
+    private void CalendarViewPanel_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Delta == 0)
+        {
+            return;
+        }
+
+        _visibleMonth = _visibleMonth.AddMonths(e.Delta > 0 ? -1 : 1);
+        RenderCalendar();
+        e.Handled = true;
     }
 
     private void GoToToday()

@@ -71,6 +71,9 @@ public partial class MainWindow : Window
     /// <summary>今天那一格的农历行改写这两个字 —— 用文字而不是装饰标记「今天」。</summary>
     private const string TodayCellLabel = "今天";
 
+    /// <summary>今天的数字放大这么多倍。行高恒按普通字号算，所以放大不会顶动农历行。</summary>
+    private const double TodayNumberScale = 1.22;
+
     /// <summary>
     /// 背景不透明度低于此值时，面板已经兜不住文字，自动把文字阴影加回来。
     /// 用户可以把「背景透明度」一路拉到 0，那时文字是直接浮在壁纸上的。
@@ -282,12 +285,16 @@ public partial class MainWindow : Window
         var borderAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 170, 0, 90);
         AppSurface.BorderBrush = FrozenBrush(WpfColor.FromArgb(borderAlpha, 255, 255, 255));
 
-        if (PrevMonthBtn is not null)
+        // 顶栏的文字与字形都跟着用户选的文字色走（放大镜是矢量描边，绑的也是 Foreground）
+        if (SettingsBtn is not null)
         {
+            TodayBtn.Foreground = brush;
             PrevMonthBtn.Foreground = brush;
             NextMonthBtn.Foreground = brush;
             SettingsBtn.Foreground = brush;
             CloseBtn.Foreground = brush;
+            SearchToggleBtn.Foreground = brush;
+            SearchCloseBtn.Foreground = brush;
         }
 
         UpdateModeButtons();
@@ -358,6 +365,11 @@ public partial class MainWindow : Window
 
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        // WPF 的 TextBox 没有占位文字，只能自己盖一层，跟着内容显隐。
+        SearchPlaceholder.Visibility = SearchTextBox.Text.Length == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         // 每敲一个字都做全表扫描 + 重建 UI 太重，做一次短防抖。
         _searchDebounceTimer ??= CreateSearchDebounceTimer();
         _searchDebounceTimer.Stop();
@@ -598,9 +610,11 @@ public partial class MainWindow : Window
             EndPoint = new WpfPoint(0, 1),
             GradientStops =
             {
+                // 0x33 在亮壁纸上会变成一条穿过整个月历的亮线，比它要表达的"周末"还显眼。
+                // 降到 0x1C 并把渐变收进来一点：需要时看得见，不需要时不抢戏。
                 new GradientStop(WpfColor.FromArgb(0x00, 255, 255, 255), 0.0),
-                new GradientStop(WpfColor.FromArgb(0x33, 255, 255, 255), 0.12),
-                new GradientStop(WpfColor.FromArgb(0x33, 255, 255, 255), 0.88),
+                new GradientStop(WpfColor.FromArgb(0x1C, 255, 255, 255), 0.18),
+                new GradientStop(WpfColor.FromArgb(0x1C, 255, 255, 255), 0.82),
                 new GradientStop(WpfColor.FromArgb(0x00, 255, 255, 255), 1.0)
             }
         };
