@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="透明日历设置"
         Width="430"
-        Height="630"
+        SizeToContent="Height"
+        MaxHeight="900"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         WindowStyle="None"
@@ -15,8 +16,13 @@
             Background="#CC1A1A1A"
             BorderBrush="#55FFFFFF"
             BorderThickness="1">
+    <!-- 内容超过 MaxHeight（高 DPI / 大系统字体）时可滚动，避免底部按钮被裁掉。 -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid>
+        <!-- 索引 0-10 为内容行，11 为弹性留白，12 为底部按钮。 -->
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -34,6 +40,8 @@
             <Button Content="×"
                     Width="30"
                     Height="30"
+                    Padding="0"
+                    FontSize="16"
                     DockPanel.Dock="Right"
                     Click="Cancel_Click"/>
             <TextBlock Text="透明日历设置"
@@ -75,7 +83,23 @@
 
         <DockPanel Grid.Row="5" Margin="0,0,0,12">
             <TextBlock Text="文字颜色" Width="92" Foreground="White" VerticalAlignment="Center"/>
-            <TextBox x:Name="ColorText" Text="#FFFFFFFF"/>
+            <Button x:Name="PickColorButton"
+                    Content="选取…"
+                    Width="64"
+                    Padding="0"
+                    Height="26"
+                    DockPanel.Dock="Right"
+                    Margin="6,0,0,0"
+                    Click="PickColor_Click"/>
+            <Border x:Name="ColorPreview"
+                    Width="24"
+                    Height="24"
+                    DockPanel.Dock="Right"
+                    Margin="6,0,0,0"
+                    CornerRadius="4"
+                    BorderBrush="#66FFFFFF"
+                    BorderThickness="1"/>
+            <TextBox x:Name="ColorText" Text="#FFFFFFFF" TextChanged="ColorText_TextChanged"/>
         </DockPanel>
 
         <DockPanel Grid.Row="6" Margin="0,0,0,12">
@@ -86,39 +110,56 @@
             </ComboBox>
         </DockPanel>
 
-        <StackPanel Grid.Row="7" Margin="0,0,0,12">
+        <DockPanel Grid.Row="7" Margin="0,0,0,12">
+            <TextBlock Text="窗口层级" Width="92" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox x:Name="WindowLayerCombo"
+                      ToolTip="置底：始终位于其他窗口之下，但仍在桌面图标之上&#x0a;嵌入桌面：再沉一层，落到桌面图标之下（Wallpaper Engine 在跑时可能被壁纸盖住）">
+                <ComboBoxItem Content="置底"/>
+                <ComboBoxItem Content="嵌入桌面"/>
+                <ComboBoxItem Content="普通"/>
+                <ComboBoxItem Content="置顶"/>
+            </ComboBox>
+        </DockPanel>
+
+        <StackPanel Grid.Row="8" Margin="0,0,0,12">
             <CheckBox x:Name="LockWindowCheck" Content="锁定位置和大小" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="MondayStartCheck" Content="周一作为一周开始" Foreground="White" Margin="0,0,0,8"/>
-            <CheckBox x:Name="TopmostCheck" Content="始终显示在窗口上方" Foreground="White" Margin="0,0,0,8"/>
-            <CheckBox x:Name="DesktopLayerCheck" Content="显示在桌面壁纸上方" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="ShowLunarCheck" Content="显示农历与节气" Foreground="White" Margin="0,0,0,8"/>
+            <CheckBox x:Name="ShowHolidayCheck"
+                      Content="显示法定节假日与调休（需联网获取）"
+                      Foreground="White"
+                      Margin="0,0,0,8"
+                      ToolTip="调休安排没有算法可推，只能从公开数据源获取。首次获取后会缓存到本地，之后离线可用；关闭后不会发出任何网络请求。"/>
             <CheckBox x:Name="BootCheck" Content="开机自动启动" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="CloseToTrayCheck" Content="关闭后进入后台" Foreground="White" Margin="0,0,0,8"/>
             <CheckBox x:Name="StartInTrayCheck" Content="启动后进入后台" Foreground="White"/>
         </StackPanel>
 
-        <Button Grid.Row="8"
+        <Button Grid.Row="9"
                 Content="打开本地存储位置"
                 HorizontalAlignment="Left"
                 Padding="12,6"
                 Margin="0,0,0,12"
                 Click="OpenStorage_Click"/>
 
-        <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,0,0,12">
+        <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="0,0,0,12">
             <Button Content="导出备份" Padding="12,6" Margin="0,0,8,0" Click="ExportBackup_Click"/>
             <Button Content="导入备份" Padding="12,6" Click="ImportBackup_Click"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="10"
+        <TextBlock Grid.Row="11"
                    x:Name="StoragePathText"
                    TextWrapping="Wrap"
+                   VerticalAlignment="Top"
                    Foreground="#CCFFFFFF"
                    FontSize="12"/>
 
-        <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="12" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="取消" Width="76" Margin="0,0,8,0" Click="Cancel_Click"/>
             <Button Content="保存" Width="76" Click="Save_Click"/>
         </StackPanel>
     </Grid>
+    </ScrollViewer>
     </Border>
 </Window>
 
