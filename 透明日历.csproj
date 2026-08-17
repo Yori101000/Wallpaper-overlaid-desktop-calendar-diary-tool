@@ -8,7 +8,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>TransparentCalendar</AssemblyName>
     <RootNamespace>TransparentCalendar</RootNamespace>
-    <ApplicationIcon />
+    <!-- 由 Native/AppIcon.cs 程序化生成，重新生成见 Tests/IconGeneratorTests.cs -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>1.0.0</Version>
   </PropertyGroup>
+
+  <!-- 测试工程在 Tests\ 下，必须排除，否则会被本工程的默认通配符一起编译。 -->
+  <ItemGroup>
+    <Compile Remove="Tests/**" />
+    <None Remove="Tests/**" />
+    <Page Remove="Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TransparentCalendar.Tests" />
+  </ItemGroup>
 </Project>
