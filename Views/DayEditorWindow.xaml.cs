@@ -3,30 +3,30 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using TransparentCalendar.Models;
+using static TransparentCalendar.Models.CalendarQuery;
+using static TransparentCalendar.Models.DateKeys;
 
 namespace TransparentCalendar.Views;
+
+/// <summary>待推迟到目标日期的待办。点"保存"时才真正提交。</summary>
+public sealed record PendingPostpone(DateTime TargetDate, TodoItem Todo);
 
 public partial class DayEditorWindow : Window
 {
     private readonly DateTime _date;
     private readonly CalendarEntry _entry;
-    private readonly Action<DateTime, TodoItem> _postponeTodo;
     private readonly ObservableCollection<TodoItem> _todos;
+    private readonly List<PendingPostpone> _pendingPostpones = [];
 
-    public DayEditorWindow(DateTime date, CalendarEntry entry, Action<DateTime, TodoItem> postponeTodo)
+    /// <summary>对话框以"保存"关闭后，由调用方提交这些推迟。</summary>
+    public IReadOnlyList<PendingPostpone> PendingPostpones => _pendingPostpones;
+
+    public DayEditorWindow(DateTime date, CalendarEntry entry)
     {
         InitializeComponent();
         _date = date;
         _entry = entry;
-        _postponeTodo = postponeTodo;
-        _todos = new ObservableCollection<TodoItem>(_entry.Todos.Select(todo => new TodoItem
-        {
-            Text = todo.Text,
-            Priority = string.IsNullOrWhiteSpace(todo.Priority) ? "普通" : todo.Priority,
-            PostponedFromDate = todo.PostponedFromDate,
-            PostponedDays = todo.PostponedDays,
-            IsDone = todo.IsDone
-        }));
+        _todos = new ObservableCollection<TodoItem>(_entry.Todos.Select(todo => todo.Clone()));
 
         DateTitle.Text = date.ToString("yyyy 年 M 月 d 日 dddd", CultureInfo.GetCultureInfo("zh-CN"));
         TodoItems.ItemsSource = _todos;
@@ -64,9 +64,14 @@ public partial class DayEditorWindow : Window
         }
     }
 
+    /// <summary>
+    /// 只在本窗口内登记，不立即落盘 —— 否则点了"推迟"再点"取消"也无法回滚。
+    /// </summary>
     private void PostponeTodo_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not TodoItem item || item.IsDone || string.IsNullOrWhiteSpace(item.Text))
+        if ((sender as FrameworkElement)?.DataContext is not TodoItem item
+            || item.IsDone
+            || string.IsNullOrWhiteSpace(item.Text))
         {
             return;
         }
@@ -75,73 +80,40 @@ public partial class DayEditorWindow : Window
         var postponedFromDate = string.IsNullOrWhiteSpace(item.PostponedFromDate)
             ? DateKey(_date)
             : item.PostponedFromDate;
-        var postponedDays = CalculatePostponedDays(postponedFromDate, targetDate);
-        var postponedTodo = new TodoItem
-        {
-            Text = item.Text.Trim(),
-            Priority = string.IsNullOrWhiteSpace(item.Priority) ? "普通" : item.Priority,
-            PostponedFromDate = postponedFromDate,
-            PostponedDays = postponedDays,
-            IsDone = false
-        };
 
+        var postponedTodo = item.Clone();
+        postponedTodo.Text = item.Text.Trim();
+        postponedTodo.PostponedFromDate = postponedFromDate;
+        postponedTodo.PostponedDays = CalculatePostponedDays(postponedFromDate, targetDate);
+        postponedTodo.IsDone = false;
+
+        _pendingPostpones.Add(new PendingPostpone(targetDate, postponedTodo));
         _todos.Remove(item);
-        SaveTodosToEntry();
-        _postponeTodo(targetDate, postponedTodo);
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        _entry.Todos = _todos
-            .Where(todo => !string.IsNullOrWhiteSpace(todo.Text))
-            .Select(todo => new TodoItem
-            {
-                Text = todo.Text.Trim(),
-                Priority = string.IsNullOrWhiteSpace(todo.Priority) ? "普通" : todo.Priority,
-                PostponedFromDate = todo.PostponedFromDate,
-                PostponedDays = todo.PostponedDays,
-                IsDone = todo.IsDone
-            })
-            .ToList();
+        _entry.Todos = BuildTodoList();
         _entry.Diary = DiaryText.Text.Trim();
         DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
+        _pendingPostpones.Clear();
         DialogResult = false;
     }
 
-    private void SaveTodosToEntry()
+    private List<TodoItem> BuildTodoList()
     {
-        _entry.Todos = _todos
+        return _todos
             .Where(todo => !string.IsNullOrWhiteSpace(todo.Text))
-            .Select(todo => new TodoItem
+            .Select(todo =>
             {
-                Text = todo.Text.Trim(),
-                Priority = string.IsNullOrWhiteSpace(todo.Priority) ? "普通" : todo.Priority,
-                PostponedFromDate = todo.PostponedFromDate,
-                PostponedDays = todo.PostponedDays,
-                IsDone = todo.IsDone
+                var copy = todo.Clone();
+                copy.Text = copy.Text.Trim();
+                return copy;
             })
             .ToList();
-        _entry.UpdatedAt = DateTime.Now;
-    }
-
-    private static int CalculatePostponedDays(string postponedFromDate, DateTime targetDate)
-    {
-        return DateTime.TryParseExact(
-            postponedFromDate,
-            "yyyy-MM-dd",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out var fromDate)
-            ? Math.Max(1, (targetDate.Date - fromDate.Date).Days)
-            : 1;
-    }
-
-    private static string DateKey(DateTime date)
-    {
-        return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 }

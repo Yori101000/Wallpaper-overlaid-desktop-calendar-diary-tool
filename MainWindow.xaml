@@ -10,7 +10,10 @@
         Background="Transparent"
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Variable">
     <Window.Resources>
         <Style x:Key="CalendarButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -24,40 +27,36 @@
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid RenderTransformOrigin="0.5,0.5">
-                            <Grid.RenderTransform>
-                                <ScaleTransform x:Name="CellScale" ScaleX="1" ScaleY="1"/>
-                            </Grid.RenderTransform>
-                            <Border Background="{TemplateBinding Background}" CornerRadius="7"/>
+                        <Grid>
+                            <!-- 填充圆角矩形这一族现在由下面的 HoverLayer 独占："今天"曾经也在这里
+                                 铺填充 + 内描边，和 hover 撞得分不清，已经撤掉（改由今日块承载）。
+                                 Background/BorderBrush 仍绑出来供样式默认值使用。 -->
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="9"/>
                             <Border x:Name="HoverLayer"
-                                    Background="#24FFFFFF"
-                                    BorderBrush="#66FFFFFF"
+                                    Background="#20FFFFFF"
+                                    BorderBrush="#4DFFFFFF"
                                     BorderThickness="1"
-                                    CornerRadius="7"
+                                    CornerRadius="9"
                                     Opacity="0"/>
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Grid>
                         <ControlTemplate.Triggers>
+                            <!-- 只做透明度过渡。原先还叠了 ScaleTransform 1.025，
+                                 缩放会让格子里的文字重排并渲染发虚。 -->
                             <EventTrigger RoutedEvent="Mouse.MouseEnter">
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="HoverLayer"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="1"
-                                                         Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="CellScale"
-                                                         Storyboard.TargetProperty="ScaleX"
-                                                         To="1.025"
-                                                         Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="CellScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="1.025"
                                                          Duration="0:0:0.12"/>
                                     </Storyboard>
                                 </BeginStoryboard>
@@ -68,14 +67,6 @@
                                         <DoubleAnimation Storyboard.TargetName="HoverLayer"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0"
-                                                         Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="CellScale"
-                                                         Storyboard.TargetProperty="ScaleX"
-                                                         To="1"
-                                                         Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="CellScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="1"
                                                          Duration="0:0:0.12"/>
                                     </Storyboard>
                                 </BeginStoryboard>
@@ -106,14 +97,20 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6">
+                                CornerRadius="8">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <!-- 原先 hover 也设成 #18FFFFFF，与默认 Setter 完全相同 ——
+                                 等于这排按钮根本没有悬停反馈。必须比默认值更亮。 -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#18FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#2EFFFFFF"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#55FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#44FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -140,7 +137,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7">
+                                CornerRadius="9">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               TextElement.Foreground="{TemplateBinding Foreground}"
@@ -159,36 +156,133 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 搜索框：WPF 默认 TextBox 自带一圈系统 chrome，在半透明浮层上与自定义按钮风格割裂。 -->
+        <Style x:Key="OverlayTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="SelectionBrush" Value="#66FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#26FFFFFF"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1FFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#26FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#59FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 滚动条：系统默认滚动条在深色半透明底上非常突兀。改成 4px 极简滑块，
+             不占布局宽度（Width 固定 8，滑块居中）。这里用隐式 Style，
+             ListViewPanel 与 WebNoteViewPanel 的 ScrollViewer 都会套用。 -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="Bar"
+                                                        Width="4"
+                                                        Background="#3DFFFFFF"
+                                                        CornerRadius="2"
+                                                        HorizontalAlignment="Center"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bar" Property="Background" Value="#6BFFFFFF"/>
+                                                        <Setter TargetName="Bar" Property="Width" Value="6"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="Bar" Property="Background" Value="#8AFFFFFF"/>
+                                                        <Setter TargetName="Bar" Property="Width" Value="6"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <!-- 轨道上下的翻页区做成透明无边框，默认模板那两个箭头按钮直接去掉 -->
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" IsTabStop="False"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" IsTabStop="False"/>
+                                </Track.DecreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="Root" Background="Transparent" MouseLeftButtonDown="Root_MouseLeftButtonDown">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
 
-        <Border x:Name="HeaderBar"
-                Margin="10,6,10,0"
-                Padding="10,4"
-                CornerRadius="8"
+        <!--
+            整个界面只有**一块**表面：底色、边框、圆角全部由 AppSurface 承载。
+            HeaderBar / ModeSidebar / MainContentPanel 一律不再自带背景与边框，
+            否则又会变回"盒子套盒子"，透明度也会被层层叠加吃掉。
+            ApplySettings() 只给 AppSurface 上色。
+        -->
+        <Border x:Name="AppSurface"
+                Margin="10"
+                CornerRadius="14"
                 Background="#50181818"
                 BorderBrush="#38FFFFFF"
                 BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+        <Border x:Name="HeaderBar"
+                Padding="12,10,12,6">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <Button x:Name="PrevMonthBtn" Content="‹" Width="28" Height="28" Click="PreviousMonth_Click" Style="{StaticResource NavButtonStyle}"/>
+                    <Button x:Name="PrevMonthBtn" Content="‹" Width="28" Height="28" Click="PreviousMonth_Click" Style="{StaticResource NavButtonStyle}" ToolTip="上一月（←）"/>
                     <TextBlock x:Name="MonthTitle" Margin="10,0" MinWidth="120" TextAlignment="Center" VerticalAlignment="Center" FontWeight="Light" FontSize="20"/>
-                    <Button x:Name="NextMonthBtn" Content="›" Width="28" Height="28" Click="NextMonth_Click" Style="{StaticResource NavButtonStyle}"/>
+                    <Button x:Name="NextMonthBtn" Content="›" Width="28" Height="28" Click="NextMonth_Click" Style="{StaticResource NavButtonStyle}" ToolTip="下一月（→）"/>
+                    <Button x:Name="TodayBtn" Content="今天" MinWidth="44" Height="28" Margin="8,0,0,0" Click="Today_Click" Style="{StaticResource NavButtonStyle}" FontSize="13" ToolTip="回到今天（T）"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    <Button x:Name="SettingsBtn" Content="设置" MinWidth="44" Height="28" Click="Settings_Click" Style="{StaticResource NavButtonStyle}"/>
+                    <Button x:Name="SettingsBtn" Content="设置" MinWidth="44" Height="28" Click="Settings_Click" Style="{StaticResource NavButtonStyle}" FontSize="13"/>
                     <Button x:Name="CloseBtn" Content="×" Width="28" Height="28" Margin="4,0,0,0" Click="Close_Click" Style="{StaticResource NavButtonStyle}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid x:Name="BodyGrid" Grid.Row="1" Margin="10,4,10,10">
+        <Grid x:Name="BodyGrid" Grid.Row="1" Margin="12,0,12,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftSidebarColumn" Width="68"/>
                 <ColumnDefinition x:Name="MainContentColumn" Width="*"/>
@@ -197,12 +291,7 @@
 
             <Border x:Name="ModeSidebar"
                     Grid.Column="0"
-                    Margin="0,0,10,0"
-                    Padding="6"
-                    CornerRadius="8"
-                    Background="#55181818"
-                    BorderBrush="#40FFFFFF"
-                    BorderThickness="1">
+                    Margin="0,0,12,0">
                 <StackPanel>
                     <Button x:Name="CalendarModeButton"
                             Content="月历"
@@ -220,12 +309,7 @@
             </Border>
 
             <Border x:Name="MainContentPanel"
-                    Grid.Column="1"
-                    Padding="10"
-                    CornerRadius="8"
-                    Background="#50181818"
-                    BorderBrush="#38FFFFFF"
-                    BorderThickness="1">
+                    Grid.Column="1">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -240,20 +324,15 @@
                         <TextBox x:Name="SearchTextBox"
                                  Height="30"
                                  MinWidth="180"
-                                 VerticalContentAlignment="Center"
-                                 Background="#22FFFFFF"
-                                 Foreground="White"
-                                 BorderBrush="#40FFFFFF"
+                                 Style="{StaticResource OverlayTextBoxStyle}"
                                  TextChanged="SearchTextBox_TextChanged"/>
                     </DockPanel>
 
                     <Grid Grid.Row="1">
+                        <!-- 底色与边框已上移到 MainContentPanel 单层承载：原先这里再叠一层
+                             #22181818 + 白边，实际黑度 ≈40%，比设置里的「背景透明度」更闷。 -->
                         <Border x:Name="CalendarViewPanel"
-                                Padding="8"
-                                CornerRadius="7"
-                                Background="#22181818"
-                                BorderBrush="#24FFFFFF"
-                                BorderThickness="1">
+                                Padding="4,0,4,0">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -263,21 +342,63 @@
 
                                 <UniformGrid x:Name="WeekHeaderGrid" Grid.Row="0" Columns="7" Margin="2,0,2,4"/>
 
-                                <Border x:Name="TodayTodoPanel"
+                                <!--
+                                    今日块。「今天」的识别任务从日期格搬到了这里 ——
+                                    格子只有 ~52px 高却要塞数字/农历/圆点，再加一样标记只会更脏。
+                                    这块常驻显示（不再只在有待办时出现），否则"今天"会时有时无。
+                                    用提亮而非再压黑一层，避免与主面板叠加。
+                                -->
+                                <Border x:Name="TodayPanel"
                                         Grid.Row="1"
                                         Margin="0,0,0,8"
-                                        Padding="8,6"
-                                        CornerRadius="6"
-                                        Background="#33181818"
-                                        Visibility="Collapsed">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock x:Name="TodayTodoTitle"
-                                                   Text="今日待办"
-                                                   Margin="0,0,10,0"
-                                                   VerticalAlignment="Center"
-                                                   FontWeight="Normal"/>
-                                        <WrapPanel x:Name="TodayTodoItems"/>
-                                    </DockPanel>
+                                        Padding="12,8"
+                                        CornerRadius="9"
+                                        Background="#14FFFFFF">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock x:Name="TodayDayNumber"
+                                                       Grid.Column="0"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="Light"
+                                                       Typography.NumeralAlignment="Tabular"/>
+
+                                            <StackPanel Grid.Column="1"
+                                                        Margin="11,0,8,0"
+                                                        VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="TodayDateLine"
+                                                               VerticalAlignment="Center"
+                                                               FontWeight="SemiBold"/>
+                                                    <!-- 假日标签是唯一允许颜色参与"今天"表达的地方：
+                                                         它承载的是法定属性，不是"今天"本身。 -->
+                                                    <Border x:Name="TodayHolidayChip"
+                                                            Margin="7,0,0,0"
+                                                            Padding="5,0,5,1"
+                                                            CornerRadius="5"
+                                                            VerticalAlignment="Center"
+                                                            Visibility="Collapsed">
+                                                        <TextBlock x:Name="TodayHolidayText"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock x:Name="TodayLunarLine"
+                                                           Margin="0,1,0,0"/>
+                                            </StackPanel>
+
+                                            <TextBlock x:Name="TodayTodoTitle"
+                                                       Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="Normal"/>
+                                        </Grid>
+
+                                        <WrapPanel x:Name="TodayTodoItems" Margin="0,6,0,0"/>
+                                    </StackPanel>
                                 </Border>
 
                                 <Grid x:Name="CalendarGrid" Grid.Row="2" Margin="0"/>
@@ -285,11 +406,7 @@
                         </Border>
 
                         <Border x:Name="ListViewPanel"
-                                Padding="10"
-                                CornerRadius="7"
-                                Background="#33181818"
-                                BorderBrush="#30FFFFFF"
-                                BorderThickness="1"
+                                Padding="4,0,4,0"
                                 Visibility="Collapsed">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel x:Name="ListContentPanel"/>
@@ -297,11 +414,7 @@
                         </Border>
 
                         <Border x:Name="WebNoteViewPanel"
-                                Padding="10"
-                                CornerRadius="7"
-                                Background="#33181818"
-                                BorderBrush="#30FFFFFF"
-                                BorderThickness="1"
+                                Padding="4,0,4,0"
                                 Visibility="Collapsed">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -327,11 +440,17 @@
                                 <Border Grid.Row="1"
                                         Margin="0,0,0,8"
                                         Padding="8,6"
-                                        CornerRadius="5"
+                                        CornerRadius="9"
                                         Background="#22181818"
                                         BorderBrush="#30FFFFFF"
                                         BorderThickness="1">
                                     <StackPanel>
+                                        <TextBlock x:Name="NoteListenerStatus"
+                                                   Text="检测中..."
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,4"
+                                                   TextWrapping="Wrap"/>
                                         <TextBlock Text="方式1：书签划线 - 复制下面代码到浏览器书签的网址栏（推荐Chrome/Edge）：
 方式2: 安装扩展 - 打开 chrome://extensions , 开启开发者模式, 点加载解压缩的扩展, 选择 BrowserExtension 文件夹"
                                                    Foreground="#BBFFFFFF"
@@ -353,7 +472,7 @@
                                 <Border x:Name="NoteEditorPanel"
                                         Grid.Row="3"
                                         Padding="10"
-                                        CornerRadius="6"
+                                        CornerRadius="9"
                                         Background="#44181818"
                                         BorderBrush="#30FFFFFF"
                                         BorderThickness="1"
@@ -368,19 +487,13 @@
                                         <TextBox x:Name="NoteTitleInput"
                                                  Grid.Row="0"
                                                  Height="30"
-                                                 Margin="0,0,0,6"
-                                                 VerticalContentAlignment="Center"
-                                                 Background="#22FFFFFF"
-                                                 Foreground="White"
-                                                 BorderBrush="#40FFFFFF"/>
+                                                 Margin="0,0,0,8"
+                                                 Style="{StaticResource OverlayTextBoxStyle}"/>
                                         <TextBox x:Name="NoteUrlInput"
                                                  Grid.Row="1"
                                                  Height="30"
-                                                 Margin="0,0,0,6"
-                                                 VerticalContentAlignment="Center"
-                                                 Background="#22FFFFFF"
-                                                 Foreground="White"
-                                                 BorderBrush="#40FFFFFF"/>
+                                                 Margin="0,0,0,8"
+                                                 Style="{StaticResource OverlayTextBoxStyle}"/>
                                         <TextBox x:Name="NoteContentInput"
                                                  Grid.Row="2"
                                                  Height="80"
@@ -388,9 +501,9 @@
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
                                                  VerticalScrollBarVisibility="Auto"
-                                                 Background="#22FFFFFF"
-                                                 Foreground="White"
-                                                 BorderBrush="#40FFFFFF"/>
+                                                 VerticalContentAlignment="Top"
+                                                 Padding="10,6"
+                                                 Style="{StaticResource OverlayTextBoxStyle}"/>
                                         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
                                             <Button x:Name="NoteEditorCancelBtn"
                                                     Content="取消"
@@ -412,6 +525,8 @@
                 </Grid>
             </Border>
         </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
 

@@ -27,6 +27,8 @@
             <Button Content="×"
                     Width="30"
                     Height="30"
+                    Padding="0"
+                    FontSize="16"
                     DockPanel.Dock="Right"
                     Click="Cancel_Click"/>
             <TextBlock x:Name="DateTitle"
@@ -49,11 +51,13 @@
                             <DockPanel Margin="0,4">
                                 <Button Content="删除"
                                         Width="46"
+                                        Padding="0"
                                         DockPanel.Dock="Right"
                                         Margin="8,0,0,0"
                                         Click="DeleteTodo_Click"/>
                                 <Button Content="推迟"
                                         Width="46"
+                                        Padding="0"
                                         DockPanel.Dock="Right"
                                         Margin="8,0,0,0"
                                         Click="PostponeTodo_Click">

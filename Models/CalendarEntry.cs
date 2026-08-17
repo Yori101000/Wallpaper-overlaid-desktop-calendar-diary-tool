@@ -20,4 +20,16 @@ public sealed class TodoItem
 
     [JsonIgnore]
     public string PostponedLabel => PostponedDays > 0 ? $"已推迟 {PostponedDays} 天" : string.Empty;
+
+    public TodoItem Clone()
+    {
+        return new TodoItem
+        {
+            Text = Text,
+            Priority = string.IsNullOrWhiteSpace(Priority) ? "普通" : Priority,
+            PostponedFromDate = PostponedFromDate,
+            PostponedDays = PostponedDays,
+            IsDone = IsDone
+        };
+    }
 }
