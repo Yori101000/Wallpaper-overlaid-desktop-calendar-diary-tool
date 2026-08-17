@@ -4,6 +4,9 @@
 const HIGHLIGHT_COLOR = "#FFEB3B";
 const HIGHLIGHT_HOVER_COLOR = "#FFD600";
 
+// 太短的文本不恢复高亮：像"的""the"这种会在整页命中几十处，把页面刷成一片黄。
+const MIN_RESTORE_LENGTH = 8;
+
 // 页面加载后恢复已保存的高亮（从 storage 读取）
 restoreHighlights();
 
@@ -18,13 +21,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
-// 键盘快捷键监听
-document.addEventListener("keydown", (e) => {
-  if (e.ctrlKey && e.shiftKey && (e.key === "S" || e.key === "s")) {
-    e.preventDefault();
-    chrome.runtime.sendMessage({ action: "keyboardSave" });
-  }
-});
+// 注意：不要在这里监听 Ctrl+Shift+S。快捷键由 manifest 的 commands 在浏览器层处理，
+// 页面侧再监听只会白白 preventDefault 掉所有网站上的这个组合键。
 
 // 核心：划线高亮选中文本
 function highlightSelection() {
@@ -127,37 +125,46 @@ function restoreHighlights() {
   chrome.storage.local.get(["highlights"], (result) => {
     const allHighlights = result.highlights || {};
     const pageHighlights = allHighlights[pageKey] || [];
+
+    // 本页没有记录就直接返回，不做任何 DOM 遍历 —— 内容脚本注入在 <all_urls>，
+    // 绝大多数页面都会走到这一行。
     if (pageHighlights.length === 0) return;
 
-    // 尝试匹配文本并高亮
-    pageHighlights.forEach(h => {
-      if (!h.text) return;
-      highlightTextInBody(h.text);
-    });
+    const targets = pageHighlights
+      .map(h => h.text)
+      .filter(text => text && text.length >= MIN_RESTORE_LENGTH);
+
+    if (targets.length === 0) return;
+
+    // 一次遍历处理全部待恢复文本，而不是每条各遍历一遍整页
+    highlightTextsInBody(targets);
   });
 }
 
-// 在页面 body 中查找文本并高亮
-function highlightTextInBody(text) {
-  const treeWalker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_TEXT,
-    null,
-    false
-  );
+// 在页面 body 中查找文本并高亮（每条只高亮首个匹配）
+function highlightTextsInBody(texts) {
+  const remaining = new Set(texts);
+  const treeWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
 
-  const textNodes = [];
-  while (treeWalker.nextNode()) {
+  const pending = [];
+  while (treeWalker.nextNode() && remaining.size > 0) {
     const node = treeWalker.currentNode;
-    if (node.textContent && node.textContent.includes(text)) {
-      textNodes.push(node);
+    const content = node.textContent;
+    if (!content) continue;
+
+    for (const text of remaining) {
+      const idx = content.indexOf(text);
+      if (idx === -1) continue;
+
+      pending.push({ node, idx, text });
+      // 每条摘录只高亮第一处命中，避免同一句话在页面里出现多次时满屏泛黄
+      remaining.delete(text);
+      break;
     }
   }
 
-  textNodes.forEach((node) => {
-    const idx = node.textContent.indexOf(text);
-    if (idx === -1) return;
-
+  // 遍历结束后再改 DOM —— 边遍历边 surroundContents 会让 TreeWalker 的游标失效
+  pending.forEach(({ node, idx, text }) => {
     try {
       const range = document.createRange();
       range.setStart(node, idx);
@@ -174,7 +181,7 @@ function highlightTextInBody(text) {
 
       range.surroundContents(span);
     } catch (e) {
-      // 跳过复杂节点
+      // 跨元素边界的选区无法 surroundContents，跳过
     }
   });
 }

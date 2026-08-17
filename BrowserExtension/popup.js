@@ -1,24 +1,21 @@
 ﻿// popup.js - 弹窗逻辑
 
+// 端口探测见 config.js（与 background.js 共用）
+import { discoverPort } from "./config.js";
+
 // 检测桌面应用是否在线
 async function checkAppStatus() {
   const statusEl = document.getElementById("appStatus");
-  try {
-    const response = await fetch("http://localhost:51999/save", {
-      method: "OPTIONS",
-      signal: AbortSignal.timeout(2000)
-    });
-    if (response.status === 204 || response.ok) {
-      statusEl.textContent = "🟢 运行中";
-      statusEl.className = "status-value online";
-    } else {
-      statusEl.textContent = "🟡 未响应";
-      statusEl.className = "status-value offline";
-    }
-  } catch {
+  const port = await discoverPort();
+
+  if (port === null) {
     statusEl.textContent = "🔴 未连接";
     statusEl.className = "status-value offline";
+    return;
   }
+
+  statusEl.textContent = `🟢 运行中（端口 ${port}）`;
+  statusEl.className = "status-value online";
 }
 
 // 显示最近保存记录

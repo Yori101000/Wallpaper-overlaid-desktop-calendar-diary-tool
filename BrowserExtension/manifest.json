@@ -10,10 +10,11 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:51999/*"
+    "http://localhost/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
