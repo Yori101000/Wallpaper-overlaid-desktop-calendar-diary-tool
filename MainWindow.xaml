@@ -9,7 +9,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         WindowStyle="None"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="CanResize"
         ShowInTaskbar="False"
         SizeChanged="MainWindow_SizeChanged"
         TextOptions.TextFormattingMode="Ideal"
@@ -40,8 +40,8 @@
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="9"/>
                             <Border x:Name="HoverLayer"
-                                    Background="#20FFFFFF"
-                                    BorderBrush="#4DFFFFFF"
+                                    Background="#16FFFFFF"
+                                    BorderBrush="#33FFFFFF"
                                     BorderThickness="1"
                                     CornerRadius="9"
                                     Opacity="0"/>
@@ -300,6 +300,15 @@
                             <EventTrigger RoutedEvent="Mouse.MouseEnter">
                                 <BeginStoryboard>
                                     <Storyboard>
+                                        <!-- 先立即置 Visible 再淡入：Collapsed 的元素动 Opacity 是白动 -->
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="MonthArrows"
+                                                                       Storyboard.TargetProperty="Visibility">
+                                            <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                                                <DiscreteObjectKeyFrame.Value>
+                                                    <Visibility>Visible</Visibility>
+                                                </DiscreteObjectKeyFrame.Value>
+                                            </DiscreteObjectKeyFrame>
+                                        </ObjectAnimationUsingKeyFrames>
                                         <DoubleAnimation Storyboard.TargetName="MonthArrows"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="1" Duration="0:0:0.12"/>
@@ -312,6 +321,15 @@
                                         <DoubleAnimation Storyboard.TargetName="MonthArrows"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0" Duration="0:0:0.16"/>
+                                        <!-- 淡出结束后再收起，否则会瞬间消失 -->
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="MonthArrows"
+                                                                       Storyboard.TargetProperty="Visibility">
+                                            <DiscreteObjectKeyFrame KeyTime="0:0:0.16">
+                                                <DiscreteObjectKeyFrame.Value>
+                                                    <Visibility>Collapsed</Visibility>
+                                                </DiscreteObjectKeyFrame.Value>
+                                            </DiscreteObjectKeyFrame>
+                                        </ObjectAnimationUsingKeyFrames>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </EventTrigger>
@@ -320,13 +338,19 @@
                         <TextBlock x:Name="MonthTitle" VerticalAlignment="Center"
                                    FontWeight="Light" FontSize="21"
                                    ToolTip="滚轮翻月 · ← → 切换 · T 回到今天"/>
+                        <Button x:Name="TodayBtn" Content="今天" Margin="14,0,0,0" Click="Today_Click"
+                                Style="{StaticResource GhostButtonStyle}" ToolTip="回到今天（T）"/>
                         <!--
-                            ‹ › 平时**完全隐形**（Opacity=0），鼠标进入这一组才淡入。
-                            常驻显示时它们是两个只为翻月存在的字形，在干净玻璃上重得不成比例；
-                            但完全没有可点的东西，用户又不知道怎么翻月。悬停浮现兼顾两头。
-                            注意用 Opacity 而不是 Visibility：折叠会让标题左右跳动。
+                            ‹ › 排在这一组的**最右端**且平时 Collapsed（不占位）。
+                            两处都是刻意的：
+                            - 用 Visibility 而不是 Opacity —— Opacity=0 照样占 50px 布局，
+                              于是标题与「今天」之间空出一段什么都没有的距离，像排版失误。
+                            - 放在「今天」之后 —— 这一组是 DockPanel.Dock=Left，右侧就是空白填充区，
+                              所以箭头展开时向右长进空白，**不会推动标题与「今天」**。
+                              这正是当初用 Opacity 想避免的跳动，换位置就自然没有了。
                         -->
-                        <StackPanel x:Name="MonthArrows" Orientation="Horizontal" Opacity="0"
+                        <StackPanel x:Name="MonthArrows" Orientation="Horizontal"
+                                    Visibility="Collapsed" Opacity="0"
                                     VerticalAlignment="Center" Margin="6,0,0,0">
                             <Button x:Name="PrevMonthBtn" Content="‹" Width="22" FontSize="16"
                                     Padding="0" Click="PreviousMonth_Click"
@@ -335,8 +359,6 @@
                                     Padding="0" Click="NextMonth_Click"
                                     Style="{StaticResource GhostButtonStyle}" ToolTip="下一月（→）"/>
                         </StackPanel>
-                        <Button x:Name="TodayBtn" Content="今天" Margin="8,0,0,0" Click="Today_Click"
-                                Style="{StaticResource GhostButtonStyle}" ToolTip="回到今天（T）"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">

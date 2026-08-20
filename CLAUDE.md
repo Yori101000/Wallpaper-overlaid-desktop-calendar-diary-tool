@@ -74,7 +74,12 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 **内容区的左右留白只有一个值：26px**（`AppSurface.Margin 10` + `BodyGrid.Margin 12` + 各视图面板 `Padding 4`）。顶栏因为自己有 `Padding 10`，只到 20px，所以搜索条要额外加 `Margin="6,0,6,0"` 才能与今日块对齐 —— **别去改 HeaderBar 的 Padding**，那会连带挪动月份标题与右侧整组控件。搜索条与今日块是同一族浅色浮层，必须同底色（`#14FFFFFF`）、同圆角（9）、静止态同样无描边。
 
-`‹ ›` 箭头贴着月份标题成一组，不是三个分离的方块；非月历模式下整组隐藏（待做与笔记跟"看哪个月"无关）。
+月份导航是「标题 + 今天 + `‹ ›`」一组，**箭头排在最后且平时 `Collapsed`**（hover 才淡入）。两处都别改回去：
+
+- **用 `Visibility` 而不是 `Opacity`**：`Opacity="0"` 照样占 50px 布局，于是标题与「今天」之间空出一段什么都没有的距离，看起来像排版失误（用户截图圈过这里）。
+- **箭头放在「今天」之后**：这一组是 `DockPanel.Dock="Left"`，右侧就是空白填充区，所以箭头展开时向右长进空白，**不会推动标题与「今天」**。当初用 Opacity 就是想避免这种跳动 —— 换个位置就自然没有了，两全。
+
+非月历模式下整组隐藏（待做与笔记跟"看哪个月"无关）。
 
 **窄窗口降级**：窗口可拖到 480px，WPF 没有媒体查询，只能在 `MainWindow_SizeChanged` 里按 `ActualWidth` 分三档（`ApplyHeaderDensity`）——
 - ≥560：`2026年8月` + `月历 待做 笔记`
