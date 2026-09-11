@@ -16,9 +16,12 @@ if not defined PROJECT_FILE (
   exit /b 1
 )
 
+dotnet build "%PROJECT_FILE%"
+if errorlevel 1 exit /b %errorlevel%
+
 if not exist "%APP_EXE%" (
-  dotnet build "%PROJECT_FILE%"
-  if errorlevel 1 exit /b %errorlevel%
+  echo Build succeeded but "%APP_EXE%" was not found.
+  exit /b 1
 )
 
 start "" "%APP_EXE%"
