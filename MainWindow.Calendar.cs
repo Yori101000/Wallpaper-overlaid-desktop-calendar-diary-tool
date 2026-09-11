@@ -430,7 +430,9 @@ public partial class MainWindow : Window
 
         TodayDayNumber.Text = today.Day.ToString(CultureInfo.InvariantCulture);
         TodayDayNumber.FontSize = _settings.FontSize * FontScale.TodayNumber;
-        TodayDayNumber.Foreground = TextBrush(Math.Min(1, opacity + 0.08));
+        // 大号日号用月历格子里"今天"数字的同色（_todayColor，已按文字色避让）：
+        // 一屏上两个"今天"不能各挑各的颜色。
+        TodayDayNumber.Foreground = GetBrush(_todayColor, Math.Min(1, opacity + 0.08));
         TodayDayNumber.Effect = OptionalTextShadow(opacity);
 
         TodayDateLine.Text = BuildTodayDateLine(today, _visibleMonth);

@@ -260,12 +260,27 @@
 
         <!--
             整个界面只有**一块**表面：底色、边框、圆角全部由 AppSurface 承载。
-            HeaderBar / ModeSidebar / MainContentPanel 一律不再自带背景与边框，
+            HeaderBar / MainContentPanel 一律不再自带背景与边框，
             否则又会变回"盒子套盒子"，透明度也会被层层叠加吃掉。
-            ApplySettings() 只给 AppSurface 上色。
+            ApplySettings() 只给这一块表面上色。
+
+            质感来自**同一表面的影子与受光边**，不是再叠一个盒子：
+            - ShadowRing 垫在 AppSurface 之下、内缩 1px —— 环的实色像素被面板底色完全盖住，
+              看得见的只有模糊向外溢出的柔光晕、和向内渗的一点暗角。环没有子元素、
+              几何只随窗口尺寸变，DropShadowEffect 的位图只算一次：翻月与 hover 都发生在
+              AppSurface 内部，不会跟着重算。
+            - TopHighlight 是玻璃顶缘那条 1px 受光线，放在 AppSurface **内部**，水平渐变两端透明。
+            - AppSurface Margin 20（不是 10）：面板四周留出 10px 空给光晕，
+              否则会被窗口边缘硬裁掉一圈。
         -->
+        <Border x:Name="ShadowRing"
+                Margin="21"
+                CornerRadius="13"
+                Background="Transparent"
+                BorderBrush="#26000000"
+                BorderThickness="1"/>
         <Border x:Name="AppSurface"
-                Margin="10"
+                Margin="20"
                 CornerRadius="14"
                 Background="#50181818"
                 BorderBrush="#38FFFFFF"
@@ -413,8 +428,10 @@
                 <!-- 搜索条：平时收起，展开时整条盖住顶栏。十次里有九次用不到，
                      不该常年占一整行。Ctrl+F 或点放大镜展开，Esc 收起。 -->
                 <!--
-                    Margin 6 把顶栏的 20px 内缩补到 26px，与今日块的左右边缘严格相等
-                    （AppSurface 10 + BodyGrid 12 + CalendarViewPanel 4 = 26）。
+                    搜索条与今日块的左右边缘都距 AppSurface 内缘 16px
+                    （HeaderBar Padding 10 + Margin 6 / BodyGrid 12 + CalendarViewPanel 4）——
+                    这条对齐**自洽于 AppSurface 之内**：AppSurface 的外 Margin（现为 20，
+                    给光晕留空）怎么改，两者都不会相对挪动。
                     不要改 HeaderBar 的 Padding —— 那会连带挪动月份标题与右侧整组控件。
                     ✕ 收进搜索框内部，框本身才能占满整条内容宽度。
                 -->
@@ -670,7 +687,14 @@
                     </Grid>
             </Border>
         </Grid>
-            </Grid>
+            <!-- 玻璃顶缘的 1px 受光线：横渐变画刷由 ApplySettings() 运行时挂上。 -->
+            <Border x:Name="TopHighlight"
+                    Height="1"
+                    VerticalAlignment="Top"
+                    Margin="14,0,14,0"
+                    IsHitTestVisible="False"
+                    Background="Transparent"/>
+        </Grid>
         </Border>
     </Grid>
 </Window>

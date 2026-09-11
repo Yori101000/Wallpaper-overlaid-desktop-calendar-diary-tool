@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -283,11 +283,34 @@ public partial class MainWindow : Window
         // 否则透明度会层层叠加，用户调的 35% 会变成实际 40%+。
         var bgAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 255, 0, 255);
         var (panelR, panelG, panelB) = ThemePresets.PanelColorFor(_settings.ThemePreset);
-        AppSurface.Background = FrozenBrush(WpfColor.FromArgb(bgAlpha, panelR, panelG, panelB));
 
-        // 边框跟着背景一起淡出：背景全透明时还留一圈白框会很怪
+        // 底色是克制的垂直渐变：上满、下 72% —— 玻璃受光处稍亮，面才有"厚度"。
+        // RGB 不变、只有 alpha 分层，用户调的"背景透明度"不会跑偏。
+        AppSurface.Background = FrozenVerticalGradient(
+            WpfColor.FromArgb(bgAlpha, panelR, panelG, panelB),
+            WpfColor.FromArgb((byte)(bgAlpha * 0.72), panelR, panelG, panelB));
+
+        // 边框跟着背景一起淡出：背景全透明时还留一圈白框会很怪。
+        // 同样上满下半 —— 下缘自然沉进阴影里。
         var borderAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 170, 0, 90);
-        AppSurface.BorderBrush = FrozenBrush(WpfColor.FromArgb(borderAlpha, 255, 255, 255));
+        AppSurface.BorderBrush = FrozenVerticalGradient(
+            WpfColor.FromArgb(borderAlpha, 255, 255, 255),
+            WpfColor.FromArgb((byte)(borderAlpha * 0.5), 255, 255, 255));
+
+        // 质感三件套（影子 / 受光边 / 今日 tint）：全部按 BackgroundOpacity 缩放，
+        // 背景拉到 0 时一起消失，只剩文字（文字阴影由 OptionalTextShadow 另行兜底）。
+        var ringAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 110, 0, 130);
+        ShadowRing.BorderBrush = FrozenBrush(WpfColor.FromArgb(ringAlpha, 0, 0, 0));
+        ShadowRing.Effect = CreatePanelHaloEffect();
+
+        var highlightAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 150, 0, 170);
+        TopHighlight.Background = FrozenEdgeHighlight(highlightAlpha);
+
+        // 今日块底色：左缘带 today 色淡 tint、向右淡回原有浅色浮层。
+        // 点缀色只取 _todayColor（已按文字色避让过的语义色），不引入新色相。
+        var todayTint = (WpfColor)WpfColorConverter.ConvertFromString(_todayColor);
+        TodayPanel.Background = FrozenTintToWhite(
+            WpfColor.FromArgb(0x50, todayTint.R, todayTint.G, todayTint.B));
 
         // 顶栏的文字与字形都跟着用户选的文字色走（放大镜是矢量描边，绑的也是 Foreground）
         if (SettingsBtn is not null)
@@ -620,6 +643,79 @@ public partial class MainWindow : Window
                 new GradientStop(WpfColor.FromArgb(0x26, 255, 255, 255), 0.18),
                 new GradientStop(WpfColor.FromArgb(0x26, 255, 255, 255), 0.82),
                 new GradientStop(WpfColor.FromArgb(0x00, 255, 255, 255), 1.0)
+            }
+        };
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>垂直渐变（上 → 下），冻结。表面底色/边框专用，随设置低频创建，不进画刷缓存。</summary>
+    private static LinearGradientBrush FrozenVerticalGradient(WpfColor top, WpfColor bottom)
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new WpfPoint(0, 0),
+            EndPoint = new WpfPoint(0, 1),
+            GradientStops = { new GradientStop(top, 0.0), new GradientStop(bottom, 1.0) }
+        };
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// 面板边缘光晕，挂在 ShadowRing 上（该元素的作用见 XAML 注释）：
+    /// 环的像素静止，特效位图只算一次。冻结后的特效没有任何可改属性，
+    /// 所以每次 ApplySettings 都新建一个实例挂上去，而不是改旧的。
+    /// 高对比预设经 ShadowStrengthFor 让光晕更浓，与文字阴影的轻重节奏一致。
+    /// </summary>
+    private DropShadowEffect CreatePanelHaloEffect()
+    {
+        var opacity = Math.Clamp(
+            _settings.BackgroundOpacity * 1.25 * ThemePresets.ShadowStrengthFor(_settings.ThemePreset), 0, 0.6);
+        var effect = new DropShadowEffect
+        {
+            Color = Colors.Black,
+            BlurRadius = 22,
+            ShadowDepth = 1,
+            Direction = 90,
+            Opacity = opacity
+        };
+        effect.Freeze();
+        return effect;
+    }
+
+    /// <summary>玻璃顶缘的 1px 受光线：水平渐变，两端透明（对应 CornerRadius 14 的圆角收边）。</summary>
+    private static LinearGradientBrush FrozenEdgeHighlight(byte alpha)
+    {
+        var full = WpfColor.FromArgb(alpha, 255, 255, 255);
+        var empty = WpfColor.FromArgb(0, 255, 255, 255);
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new WpfPoint(0, 0.5),
+            EndPoint = new WpfPoint(1, 0.5),
+            GradientStops =
+            {
+                new GradientStop(empty, 0.0),
+                new GradientStop(full, 0.15),
+                new GradientStop(full, 0.85),
+                new GradientStop(empty, 1.0)
+            }
+        };
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>今日块底色：左缘 today 淡 tint → 右缘原有浅色浮层（#14FFFFFF）。</summary>
+    private static LinearGradientBrush FrozenTintToWhite(WpfColor tint)
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new WpfPoint(0, 0.5),
+            EndPoint = new WpfPoint(1, 0.5),
+            GradientStops =
+            {
+                new GradientStop(tint, 0.0),
+                new GradientStop(WpfColor.FromArgb(0x14, 255, 255, 255), 1.0)
             }
         };
         brush.Freeze();

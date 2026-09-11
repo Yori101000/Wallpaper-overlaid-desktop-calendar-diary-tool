@@ -72,7 +72,7 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 **顶栏里不出现任何色块。** 分段器曾经用胶囊底，结果它成了整行唯一的实色块、抢走了本该属于月份标题的重心。现在整行只有文字与线条。同理，图标一律用**矢量描边 1.4px**（放大镜、`✕`），不要用字体字形 —— 字形笔画不到 1px，和矢量图标放在一起粗细不成套。
 
-**内容区的左右留白只有一个值：26px**（`AppSurface.Margin 10` + `BodyGrid.Margin 12` + 各视图面板 `Padding 4`）。顶栏因为自己有 `Padding 10`，只到 20px，所以搜索条要额外加 `Margin="6,0,6,0"` 才能与今日块对齐 —— **别去改 HeaderBar 的 Padding**，那会连带挪动月份标题与右侧整组控件。搜索条与今日块是同一族浅色浮层，必须同底色（`#14FFFFFF`）、同圆角（9）、静止态同样无描边。
+**内容区的左右留白只有一个值：36px**（`AppSurface.Margin 20` + `BodyGrid.Margin 12` + 各视图面板 `Padding 4`）。搜索条与今日块都距 AppSurface **内缘** 16px（HeaderBar `Padding 10` + 搜索条 `Margin 6` / `BodyGrid 12` + 面板 `Padding 4`）—— 这条对齐自洽于 AppSurface 之内，AppSurface 的外 Margin 怎么改两者都不相对挪动。**别去改 HeaderBar 的 Padding**，那会连带挪动月份标题与右侧整组控件。搜索条与今日块是同一族浅色浮层：同圆角（9）、静止态无描边；搜索条底色 `#14FFFFFF`，今日块是左缘 today 色淡 tint → 右缘同色的横渐变（tint 只取现有语义色 `_todayColor`，不引入新色相）。`AppSurface.Margin 20`（不是 10）是给 ShadowRing 光晕留空，否则会被窗口边缘硬裁。
 
 月份导航是「标题 + 今天 + `‹ ›`」一组，**箭头排在最后且平时 `Collapsed`**（hover 才淡入）。两处都别改回去：
 
@@ -248,7 +248,7 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 ### 文字投影是兜底，不是常态
 
-界面已改为**单层半透明表面**（`CalendarViewPanel` / `ListViewPanel` / `WebNoteViewPanel` 只留 `Padding`，底色与边框统一由 `MainContentPanel` 承载）。原先三层嵌套的实际黑度 ≈40%，比用户在设置里调的数值更闷。
+界面已改为**单层半透明表面**（`CalendarViewPanel` / `ListViewPanel` / `WebNoteViewPanel` 只留 `Padding`，底色与边框统一由 `AppSurface` 承载）。原先三层嵌套的实际黑度 ≈40%，比用户在设置里调的数值更闷。面板的质感（底色/边框的垂直微渐变、`ShadowRing` 的柔光晕、顶缘 1px 受光线 `TopHighlight`、今日块左缘 tint）都是**同一表面的影子与受光边，不是新盒子**：ShadowRing 垫在 AppSurface 下且内缩 1px（实色被盖住，只露模糊光晕），无子元素所以 `DropShadowEffect` 位图只算一次；全部由 `ApplySettings()` 一处赋值，且整体随 `BackgroundOpacity` 缩到零。
 
 因此文字**默认不加投影** —— 一律走 `OptionalTextShadow()` 而不是 `TextShadow()`。
 但 `BackgroundOpacity` 可以被拉到 0，那时文字直接浮在壁纸上，所以 `OptionalTextShadow` 在低于 `ShadowFallbackThreshold`（0.18）时会把阴影加回来。**新增文字元素请用 `OptionalTextShadow`**。
@@ -265,6 +265,7 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 **农历 / 节气 / 传统节日**（`Models/LunarCalendar.cs`）：基于 .NET 内置的 `ChineseLunisolarCalendar`，**纯离线零依赖**。
 - 除夕靠"次日是初一"判断，**不能**假设腊月固定 30 天。
+- 初一在**格子里**显示月名（「八月」）而不是日名 —— 这是 `LunarInfo.Label` 一层的展示选择（`IsFirstDay` 标记）。`DayName` **恒为真实日名**：今日块与悬停提示拼的是「农历{MonthName}月{DayName}」，把月名塞进 `DayName` 就会拼出「农历八月八月」（2026-09-11 八月初一，被抓到过）。
 - 有闰月的年份，`GetMonth` 返回的月序号在闰月之后要减一才对应实际月份。
 - 24 节气用寿星公式，C 常数分 20 / 21 世纪两套，**混用会让多数节气整体偏一天**（曾经踩过）。2026 全年 24 个节气在测试里逐个钉死了，改动常数会立刻失败。
 
