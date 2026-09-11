@@ -496,6 +496,16 @@ public class WeekendDividerTests
         Assert.Equal(string.Empty, BuildTodayLunarLine(new LunarInfo(string.Empty, string.Empty, null, null)));
     }
 
+    [Fact]
+    public void 今日块农历行_初一不会把月名说两遍()
+    {
+        // 走 GetInfo 的真实管线而不是手造 LunarInfo：初一那天的展示分支只存在于
+        // GetInfo 的产出里，手造输入钉不住它。2026-09-11 是八月初一。
+        var lunar = LunarCalendar.GetInfo(new DateTime(2026, 9, 11));
+        Assert.True(lunar.IsFirstDay);
+        Assert.Equal("农历八月初一", BuildTodayLunarLine(lunar));
+    }
+
     [Theory]
     [InlineData("国庆节", true, "国庆节 · 休")]
     [InlineData("国庆节", false, "国庆节 · 班")]

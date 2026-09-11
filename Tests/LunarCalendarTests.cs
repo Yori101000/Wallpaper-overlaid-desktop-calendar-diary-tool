@@ -27,15 +27,19 @@ public class LunarCalendarTests
         var info = LunarCalendar.GetInfo(new DateTime(2026, 2, 17));
 
         Assert.Equal("正", info.MonthName);
-        Assert.Equal("正月", info.DayName);
+        Assert.Equal("初一", info.DayName);
+        Assert.True(info.IsFirstDay);
     }
 
     [Fact]
-    public void 初一显示月名而非初一()
+    public void 初一的Label显示月名而非初一()
     {
-        // 每月第一天显示"正月"这样的月名，方便在密集的日历格里定位月份边界
-        var info = LunarCalendar.GetInfo(new DateTime(2026, 2, 17));
-        Assert.Equal("正月", info.DayName);
+        // 每月第一天在密集的日历格里显示"正月"这样的月名，方便定位月份边界。
+        // 这只是 Label 一层的展示选择：DayName 必须保留真实日名，
+        // 否则今日块与悬停提示拼「农历{MonthName}月{DayName}」时会把月名说两遍（「八月八月」）。
+        // 2026-09-11 是八月初一且无节日节气，Label 不会被它们抢走。
+        var info = LunarCalendar.GetInfo(new DateTime(2026, 9, 11));
+        Assert.Equal("八月", info.Label);
     }
 
     [Theory]

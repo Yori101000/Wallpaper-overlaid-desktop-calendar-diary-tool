@@ -2,15 +2,21 @@ using System.Globalization;
 
 namespace TransparentCalendar.Models;
 
-/// <summary>一天的农历信息。<see cref="Label"/> 是日历格上要显示的那一行。</summary>
+/// <summary>
+/// 一天的农历信息。<see cref="Label"/> 是日历格上要显示的那一行。
+/// <see cref="DayName"/> 恒为真实日名（初一就是「初一」）；初一改显示月名只是
+/// <see cref="Label"/> 的选择，别把它塞回 DayName —— 今日块与提示要拼
+/// 「农历八月 + 初一」，塞回去就会变成「八月八月」。
+/// </summary>
 public sealed record LunarInfo(
     string MonthName,
     string DayName,
     string? Festival,
-    string? SolarTerm)
+    string? SolarTerm,
+    bool IsFirstDay = false)
 {
     /// <summary>显示优先级：传统节日 &gt; 节气 &gt; 农历日（初一显示月名）。</summary>
-    public string Label => Festival ?? SolarTerm ?? DayName;
+    public string Label => Festival ?? SolarTerm ?? (IsFirstDay ? MonthName + "月" : DayName);
 
     /// <summary>节日与节气值得高亮，普通农历日不必。</summary>
     public bool IsHighlighted => Festival is not null || SolarTerm is not null;
@@ -93,11 +99,14 @@ public static class LunarCalendar
     {
         var (monthName, dayName, isFirstDay, lunarMonth, lunarDay, isLeap) = Convert(date);
 
+        // 初一「格子里改显月名」由 Label 承担；这里存真实日名，
+        // 今日块与悬停提示拼「农历八月 + 初一」才不会重复月名。
         return new LunarInfo(
             monthName,
-            isFirstDay ? monthName + "月" : dayName,
+            dayName,
             GetFestival(date, lunarMonth, lunarDay, isLeap),
-            GetSolarTerm(date));
+            GetSolarTerm(date),
+            isFirstDay);
     }
 
     private static (string MonthName, string DayName, bool IsFirstDay, int Month, int Day, bool IsLeap) Convert(
