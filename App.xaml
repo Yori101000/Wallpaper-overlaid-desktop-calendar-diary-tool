@@ -9,8 +9,9 @@
         <!--
             深色控件样式 —— 全部是**隐式样式**（无 x:Key），因此设置窗口、日期编辑器、
             笔记编辑器里的原生控件会自动套用，不必逐个挂 Style。
-            主窗口那些带 x:Key 的样式（CalendarButtonStyle / NavButtonStyle /
-            SidebarModeButtonStyle / OverlayTextBoxStyle）是显式指定的，优先级更高，不受影响。
+            主窗口带 x:Key 的样式（CalendarButtonStyle / SegmentButtonStyle）优先级更高。
+            GhostButtonStyle / OverlayTextBoxStyle / CloseIconTemplate 放在这里，
+            设置窗和日期编辑器才能跟主窗用同一套关闭按钮与输入框。
 
             用中性白做强调色：应用里青/橙/琥珀/玫红都已经有语义了（放假/调休/待办/重要），
             控件状态再引入一个强调色会和它们打架。
@@ -26,6 +27,110 @@
         <SolidColorBrush x:Key="AccentFill" Color="#EDEFF2"/>
         <SolidColorBrush x:Key="AccentInk" Color="#14161A"/>
         <SolidColorBrush x:Key="PopupFill" Color="#F51C1F26"/>
+
+        <!-- 设置窗 / 日期编辑器的小节标题：只靠字重和压暗，不再套 GroupBox。 -->
+        <Style x:Key="DialogSectionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource CtrlTextDim}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,16,0,8"/>
+        </Style>
+
+        <!-- 顶栏 / 对话框共用的关闭叉：1.4px 矢量线，不用字形（笔画不到 1px，和放大镜不成套）。 -->
+        <DataTemplate x:Key="CloseIconTemplate">
+            <Canvas Width="12" Height="12">
+                <Line X1="1" Y1="1" X2="11" Y2="11" StrokeThickness="1.4"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                <Line X1="11" Y1="1" X2="1" Y2="11" StrokeThickness="1.4"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Canvas>
+        </DataTemplate>
+
+        <!--
+            幽灵按钮：无底、无描边，hover / 键盘焦点才浮现一层底。
+            主窗顶栏、笔记页、设置窗、日期编辑器都用这一套，避免实心按钮在玻璃上变成盒子套盒子。
+        -->
+        <Style x:Key="GhostButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="7">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#2EFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 搜索条、笔记编辑器、日记框：静止态无描边的浅色浮层，与今日块同一族。 -->
+        <Style x:Key="OverlayTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="SelectionBrush" Value="#66FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="9">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1FFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#26FFFFFF"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#59FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- 按钮 -->
         <Style TargetType="Button">

@@ -89,9 +89,6 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush TodoBadgeBrush = CreateFrozenBrush(46, 196, 182);
     private static readonly SolidColorBrush ListItemBrush = CreateFrozenBrush(18, 255, 255, 255);
     private static readonly SolidColorBrush ListItemBorderBrush = CreateFrozenBrush(36, 255, 255, 255);
-    private static readonly SolidColorBrush NoteBorderBrush = CreateFrozenBrush(30, 255, 255, 255);
-    private static readonly SolidColorBrush DeleteButtonBrush = CreateFrozenBrush(24, 239, 71, 111);
-    private static readonly SolidColorBrush DeleteButtonBorderBrush = CreateFrozenBrush(60, 239, 71, 111);
     private static readonly SolidColorBrush ActionButtonBrush = CreateFrozenBrush(24, 255, 255, 255);
     private static readonly SolidColorBrush ActionButtonBorderBrush = CreateFrozenBrush(40, 255, 255, 255);
     /// <summary>模式 tab 选中时下方那条 2px 指示线。顶栏不出现色块，所以这是它唯一的实色。</summary>
@@ -169,6 +166,8 @@ public partial class MainWindow : Window
     private DispatcherTimer? _desktopWatchdog;
     private List<WebNoteGroup> _notes = [];
     private string? _editingNoteId;
+    /// <summary>笔记接入说明：无笔记时默认展开，有笔记后收起，用户可手动开关。</summary>
+    private bool _noteHelpExpanded;
 
     private enum ViewMode
     {
@@ -184,6 +183,7 @@ public partial class MainWindow : Window
         _settings = _storage.LoadSettings();
         _entries = _storage.LoadEntries();
         _notes = LoadNotesWithIds();
+        _noteHelpExpanded = _notes.Count == 0;
 
         _holidays = new HolidayService(System.IO.Path.Combine(_storage.AppDataDirectory, "holidays"));
         // 数据可能来自后台线程的网络请求，回调里必须切回 UI 线程再重绘。
@@ -322,6 +322,11 @@ public partial class MainWindow : Window
             CloseBtn.Foreground = brush;
             SearchToggleBtn.Foreground = brush;
             SearchCloseBtn.Foreground = brush;
+            WebNoteTitle.Foreground = brush;
+            AddNoteButton.Foreground = brush;
+            NoteHelpToggle.Foreground = brush;
+            NoteEditorCancelBtn.Foreground = brush;
+            NoteEditorTitle.Foreground = brush;
         }
 
         UpdateModeButtons();
@@ -371,7 +376,20 @@ public partial class MainWindow : Window
         ListViewPanel.Visibility = mode == ViewMode.List ? Visibility.Visible : Visibility.Collapsed;
         WebNoteViewPanel.Visibility = mode == ViewMode.Note ? Visibility.Visible : Visibility.Collapsed;
         UpdateModeButtons();
+        UpdateSearchPlaceholder();
         RefreshCurrentView();
+    }
+
+    private void UpdateSearchPlaceholder()
+    {
+        if (SearchPlaceholder is null)
+        {
+            return;
+        }
+
+        SearchPlaceholder.Text = _mode == ViewMode.Note
+            ? "搜索笔记　Esc 退出"
+            : "搜索日记与待办　Esc 退出";
     }
 
     private void RefreshCurrentView()

@@ -28,7 +28,7 @@ public partial class DayEditorWindow : Window
         _entry = entry;
         _todos = new ObservableCollection<TodoItem>(_entry.Todos.Select(todo => todo.Clone()));
 
-        DateTitle.Text = date.ToString("yyyy 年 M 月 d 日 dddd", CultureInfo.GetCultureInfo("zh-CN"));
+        DateTitle.Text = date.ToString("yyyy年M月d日 dddd", CultureInfo.GetCultureInfo("zh-CN"));
         TodoItems.ItemsSource = _todos;
         DiaryText.Text = _entry.Diary;
     }

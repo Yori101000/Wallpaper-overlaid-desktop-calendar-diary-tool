@@ -9,13 +9,13 @@ async function checkAppStatus() {
   const port = await discoverPort();
 
   if (port === null) {
-    statusEl.textContent = "🔴 未连接";
-    statusEl.className = "status-value offline";
+    statusEl.textContent = "未连接";
+    statusEl.className = "value offline";
     return;
   }
 
-  statusEl.textContent = `🟢 运行中（端口 ${port}）`;
-  statusEl.className = "status-value online";
+  statusEl.textContent = `运行中 · 端口 ${port}`;
+  statusEl.className = "value online";
 }
 
 // 显示最近保存记录
@@ -30,8 +30,8 @@ function showLastSaved() {
     const time = new Date(saved.time);
     container.innerHTML = `
       <div class="text">${escapeHtml(saved.text.substring(0, 80))}</div>
-      <div class="text" style="font-size:12px;color:#888;margin-top:4px">${escapeHtml(saved.title || saved.url)}</div>
-      <div class="time">${time.toLocaleString("zh-CN")}</div>
+      <div class="meta">${escapeHtml(saved.title || saved.url)}</div>
+      <div class="meta">${time.toLocaleString("zh-CN")}</div>
     `;
   });
 }

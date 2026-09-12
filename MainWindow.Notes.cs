@@ -89,6 +89,8 @@ public partial class MainWindow : Window
             BookmarkletText.Text = "（监听未启动，无法生成书签代码）";
         }
 
+        UpdateNoteHelpVisibility();
+
         var visibleNotes = _notes
             .Where(NoteMatchesSearch)
             .OrderByDescending(note => note.UpdatedAt)
@@ -100,10 +102,10 @@ public partial class MainWindow : Window
             {
                 Text = _searchText.Length > 0
                     ? "没有匹配的笔记。"
-                    : "暂无笔记，点击右侧 + 添加 添加网页笔记。",
+                    : "暂无笔记。点右上角「添加」，或从浏览器划线保存。",
                 Foreground = TextBrush(_settings.TextOpacity * 0.55),
                 FontSize = ScaledFont(FontScale.Hint, 13),
-                Margin = new Thickness(0, 20, 0, 0),
+                Margin = new Thickness(0, 12, 0, 0),
                 TextWrapping = TextWrapping.Wrap
             });
             return;
@@ -113,6 +115,48 @@ public partial class MainWindow : Window
         {
             WebNoteListPanel.Children.Add(CreateNoteCard(note));
         }
+    }
+
+    private void NoteHelpToggle_Click(object? sender, RoutedEventArgs e)
+    {
+        _noteHelpExpanded = !_noteHelpExpanded;
+        UpdateNoteHelpVisibility();
+    }
+
+    /// <summary>接入说明：编辑笔记时收起给编辑器腾地方，其余跟用户开关。</summary>
+    private void UpdateNoteHelpVisibility()
+    {
+        if (NoteHelpPanel is null)
+        {
+            return;
+        }
+
+        var editing = NoteEditorPanel.Visibility == Visibility.Visible;
+        NoteHelpPanel.Visibility = !editing && _noteHelpExpanded ? Visibility.Visible : Visibility.Collapsed;
+        NoteHelpToggle.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+        NoteHelpToggle.Content = _noteHelpExpanded ? "收起说明" : "接入说明";
+        AddNoteButton.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void ShowNoteEditor(WebNoteGroup? group)
+    {
+        _editingNoteId = group?.Id;
+        NoteEditorTitle.Text = group is null ? "新笔记" : "编辑笔记";
+        NoteTitleInput.Text = group?.Title ?? string.Empty;
+        NoteUrlInput.Text = group?.Url ?? string.Empty;
+        NoteContentInput.Text = group is null ? string.Empty : string.Join("\n", group.Notes);
+        NoteEditorPanel.Visibility = Visibility.Visible;
+        WebNoteListScroll.Visibility = Visibility.Collapsed;
+        UpdateNoteHelpVisibility();
+        NoteTitleInput.Focus();
+    }
+
+    private void HideNoteEditor()
+    {
+        _editingNoteId = null;
+        NoteEditorPanel.Visibility = Visibility.Collapsed;
+        WebNoteListScroll.Visibility = Visibility.Visible;
+        UpdateNoteHelpVisibility();
     }
 
     private bool NoteMatchesSearch(WebNoteGroup note)
@@ -129,11 +173,37 @@ public partial class MainWindow : Window
 
     private Border CreateNoteCard(WebNoteGroup note)
     {
-        var innerStack = new StackPanel();
+        var ghost = (Style)FindResource("GhostButtonStyle");
+        var actionBar = new StackPanel
+        {
+            Orientation = WpfOrientation.Horizontal,
+            VerticalAlignment = WpfVerticalAlignment.Center
+        };
+
+        var editBtn = new WpfButton
+        {
+            Content = "编辑",
+            Tag = note,
+            Style = ghost,
+            Foreground = TextBrush(_settings.TextOpacity * 0.85),
+            Padding = new Thickness(8, 0, 8, 0)
+        };
+        editBtn.Click += EditNote_Click;
+        actionBar.Children.Add(editBtn);
+
+        var delBtn = new WpfButton
+        {
+            Content = "删除",
+            Tag = note,
+            Style = ghost,
+            Foreground = TextBrush(_settings.TextOpacity * 0.85),
+            Padding = new Thickness(8, 0, 8, 0)
+        };
+        delBtn.Click += DeleteNote_Click;
+        actionBar.Children.Add(delBtn);
 
         var titleBtn = new WpfButton
         {
-            Content = note.Title,
             Tag = note,
             HorizontalContentAlignment = WpfHorizontalAlignment.Left,
             Foreground = TextBrush(_settings.TextOpacity),
@@ -142,17 +212,32 @@ public partial class MainWindow : Window
             Cursor = WpfCursors.Hand,
             Background = WpfBrushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(0)
+            Padding = new Thickness(0),
+            Content = new TextBlock
+            {
+                Text = note.Title,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = TextBrush(_settings.TextOpacity),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = ScaledFont(FontScale.CardTitle, 14)
+            }
         };
         titleBtn.Click += NoteTitle_Click;
-        innerStack.Children.Add(titleBtn);
+
+        var titleRow = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(actionBar, Dock.Right);
+        titleRow.Children.Add(actionBar);
+        titleRow.Children.Add(titleBtn);
+
+        var innerStack = new StackPanel();
+        innerStack.Children.Add(titleRow);
 
         if (!string.IsNullOrWhiteSpace(note.Url))
         {
             innerStack.Children.Add(new TextBlock
             {
                 Text = note.Url,
-                Foreground = TextBrush(_settings.TextOpacity * 0.55),
+                Foreground = TextBrush(_settings.TextOpacity * 0.7),
                 FontSize = ScaledFont(FontScale.Footnote, 11),
                 Margin = new Thickness(0, 2, 0, 4),
                 TextTrimming = TextTrimming.CharacterEllipsis
@@ -172,60 +257,17 @@ public partial class MainWindow : Window
                 Text = note.Notes.Count > 1 ? $"（{note.Notes.Count} 条）{preview}" : preview,
                 Foreground = TextBrush(_settings.TextOpacity * 0.72),
                 FontSize = ScaledFont(FontScale.Detail),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 6)
+                TextWrapping = TextWrapping.Wrap
             });
         }
 
-        var actionBar = new StackPanel
-        {
-            Orientation = WpfOrientation.Horizontal,
-            HorizontalAlignment = WpfHorizontalAlignment.Right
-        };
-
-        var editBtn = new WpfButton
-        {
-            Content = "编辑",
-            Tag = note,
-            MinWidth = 40,
-            Height = 24,
-            Margin = new Thickness(0, 0, 6, 0),
-            FontSize = 12,
-            Cursor = WpfCursors.Hand,
-            Background = ActionButtonBrush,
-            BorderThickness = new Thickness(1),
-            BorderBrush = ActionButtonBorderBrush,
-            Padding = new Thickness(4, 0, 4, 0)
-        };
-        editBtn.Click += EditNote_Click;
-        actionBar.Children.Add(editBtn);
-
-        var delBtn = new WpfButton
-        {
-            Content = "删除",
-            Tag = note,
-            MinWidth = 40,
-            Height = 24,
-            FontSize = 12,
-            Cursor = WpfCursors.Hand,
-            Background = DeleteButtonBrush,
-            BorderThickness = new Thickness(1),
-            BorderBrush = DeleteButtonBorderBrush,
-            Padding = new Thickness(4, 0, 4, 0)
-        };
-        delBtn.Click += DeleteNote_Click;
-        actionBar.Children.Add(delBtn);
-
-        innerStack.Children.Add(actionBar);
-
         return new Border
         {
-            Margin = new Thickness(0, 0, 0, 8),
-            Padding = new Thickness(10),
-            CornerRadius = new CornerRadius(6),
-            Background = ListItemBrush,
-            BorderBrush = NoteBorderBrush,
-            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 0, 0, 2),
+            Padding = new Thickness(2, 10, 2, 10),
+            Background = WpfBrushes.Transparent,
+            BorderBrush = GetBrush("#FFFFFF", 0.12),
+            BorderThickness = new Thickness(0, 0, 0, 1),
             Child = innerStack
         };
     }
@@ -261,12 +303,7 @@ public partial class MainWindow : Window
 
     private void AddNote_Click(object? sender, RoutedEventArgs e)
     {
-        _editingNoteId = null;
-        NoteTitleInput.Text = string.Empty;
-        NoteUrlInput.Text = string.Empty;
-        NoteContentInput.Text = string.Empty;
-        NoteEditorPanel.Visibility = Visibility.Visible;
-        NoteTitleInput.Focus();
+        ShowNoteEditor(null);
     }
 
     private void EditNote_Click(object? sender, RoutedEventArgs e)
@@ -277,12 +314,7 @@ public partial class MainWindow : Window
         }
 
         // 记录 Id 而非对象引用：浏览器扩展随时可能推送新笔记并整体换掉 _notes。
-        _editingNoteId = group.Id;
-        NoteTitleInput.Text = group.Title;
-        NoteUrlInput.Text = group.Url;
-        NoteContentInput.Text = string.Join("\n", group.Notes);
-        NoteEditorPanel.Visibility = Visibility.Visible;
-        NoteTitleInput.Focus();
+        ShowNoteEditor(group);
     }
 
     private void NoteEditorSave_Click(object? sender, RoutedEventArgs e)
@@ -327,15 +359,19 @@ public partial class MainWindow : Window
             });
         });
 
-        _editingNoteId = null;
-        NoteEditorPanel.Visibility = Visibility.Collapsed;
+        _noteHelpExpanded = false;
+        HideNoteEditor();
         RenderWebNotes();
+    }
+
+    private void BookmarkletText_GotFocus(object sender, RoutedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(() => BookmarkletText.SelectAll());
     }
 
     private void NoteEditorCancel_Click(object? sender, RoutedEventArgs e)
     {
-        _editingNoteId = null;
-        NoteEditorPanel.Visibility = Visibility.Collapsed;
+        HideNoteEditor();
     }
 
     private void DeleteNote_Click(object? sender, RoutedEventArgs e)
@@ -365,8 +401,7 @@ public partial class MainWindow : Window
 
         if (string.Equals(_editingNoteId, id, StringComparison.Ordinal))
         {
-            _editingNoteId = null;
-            NoteEditorPanel.Visibility = Visibility.Collapsed;
+            HideNoteEditor();
         }
 
         RenderWebNotes();

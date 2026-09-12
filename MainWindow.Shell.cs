@@ -134,6 +134,13 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (NoteEditorPanel.Visibility == Visibility.Visible)
+            {
+                HideNoteEditor();
+                e.Handled = true;
+                return;
+            }
+
             if (_settings.CloseToTray)
             {
                 HideWindowToTray();

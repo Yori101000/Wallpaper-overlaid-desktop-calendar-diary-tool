@@ -181,10 +181,12 @@ public partial class MainWindow : Window
 
     private void AddMonthRecordSection(List<(DateTime Date, CalendarEntry Entry)> items)
     {
-        AddListSectionTitle("本月记录");
+        // 待做页藏了月份导航，标题必须写出是哪个月，避免被读成「此刻这个月」。
+        var monthLabel = _visibleMonth.ToString("M月", CultureInfo.GetCultureInfo("zh-CN"));
+        AddListSectionTitle($"{monthLabel}的记录");
         if (items.Count == 0)
         {
-            AddListEmptyText("本月没有记录。");
+            AddListEmptyText($"{monthLabel}没有记录。");
             return;
         }
 
@@ -267,9 +269,10 @@ public partial class MainWindow : Window
         var accentBar = new Border
         {
             Background = accent,
-            Width = 4,
-            CornerRadius = new CornerRadius(2),
-            Margin = new Thickness(0, 0, 8, 0)
+            Width = 2,
+            Opacity = 0.85,
+            CornerRadius = new CornerRadius(1),
+            Margin = new Thickness(0, 2, 10, 2)
         };
         DockPanel.SetDock(accentBar, Dock.Left);
         content.Children.Add(accentBar);
