@@ -26,3 +26,9 @@ bld/
 
 # Local planning notes
 计划.txt
+
+# 开发过程截图与调试脚本（改 UI 时自动截图的目录，不进版本库）
+.shot/
+
+# 个人 IDE 配置
+.claude/
