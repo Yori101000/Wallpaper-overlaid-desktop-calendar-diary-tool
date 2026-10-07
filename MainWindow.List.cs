@@ -200,6 +200,10 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 「最近更新」默认预览最近 12 条，超出时与未完成组一样提供「显示全部」。
+    /// 早先是硬编码 Take(12) 且无展开入口：记录多时用户看不到全量，还会以为数据丢了。
+    /// </summary>
     private void AddRecentRecordSection(List<(DateTime Date, CalendarEntry Entry)> items)
     {
         AddListSectionTitle("最近更新");
@@ -209,13 +213,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        foreach (var (date, entry) in items.OrderByDescending(item => item.Entry.UpdatedAt).Take(RecentRecordPreviewCount))
+        var ordered = items.OrderByDescending(item => item.Entry.UpdatedAt).ToList();
+        var limit = _showAllTodos ? ordered.Count : Math.Min(RecentRecordPreviewCount, ordered.Count);
+        foreach (var (date, entry) in ordered.Take(limit))
         {
             AddListButton(
                 date,
                 $"{date:yyyy-MM-dd}  更新于 {entry.UpdatedAt:MM-dd HH:mm}",
                 BuildEntrySummary(entry),
                 TodoMarkerBrush);
+        }
+
+        if (ordered.Count > limit)
+        {
+            AddShowAllButton(ordered.Count - limit);
         }
     }
 

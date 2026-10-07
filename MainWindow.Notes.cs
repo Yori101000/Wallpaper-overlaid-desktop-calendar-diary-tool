@@ -224,7 +224,20 @@ public partial class MainWindow : Window
         };
         titleBtn.Click += NoteTitle_Click;
 
+        // 保存时间：紧挨操作按钮左侧，一眼看出新旧；完整时间放 ToolTip。
+        var timeLabel = new TextBlock
+        {
+            Text = note.UpdatedAt.ToString("MM-dd"),
+            ToolTip = $"保存于 {note.UpdatedAt:yyyy-MM-dd HH:mm}",
+            Foreground = TextBrush(_settings.TextOpacity * 0.55),
+            FontSize = ScaledFont(FontScale.Footnote, 10),
+            VerticalAlignment = WpfVerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        DockPanel.SetDock(timeLabel, Dock.Right);
+
         var titleRow = new DockPanel { LastChildFill = true };
+        titleRow.Children.Add(timeLabel);
         DockPanel.SetDock(actionBar, Dock.Right);
         titleRow.Children.Add(actionBar);
         titleRow.Children.Add(titleBtn);
