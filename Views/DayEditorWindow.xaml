@@ -11,8 +11,8 @@
         Background="Transparent">
     <Border Margin="8"
             Padding="18"
-            CornerRadius="10"
-            Background="#CC1A1A1A"
+            CornerRadius="12"
+            Background="#B41A1A1A"
             BorderBrush="#55FFFFFF"
             BorderThickness="1">
     <Grid>

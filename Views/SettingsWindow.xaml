@@ -12,8 +12,8 @@
         Background="Transparent">
     <Border Margin="8"
             Padding="18"
-            CornerRadius="10"
-            Background="#CC1A1A1A"
+            CornerRadius="12"
+            Background="#B41A1A1A"
             BorderBrush="#55FFFFFF"
             BorderThickness="1">
     <!-- 内容超过 MaxHeight（高 DPI / 大系统字体）时可滚动，避免底部按钮被裁掉。 -->
@@ -60,6 +60,7 @@
                 <ComboBoxItem Content="柔和青"/>
                 <ComboBoxItem Content="暖金"/>
                 <ComboBoxItem Content="高对比"/>
+                <ComboBoxItem Content="浅色磨砂"/>
             </ComboBox>
         </DockPanel>
         <DockPanel Margin="0,0,0,10">
