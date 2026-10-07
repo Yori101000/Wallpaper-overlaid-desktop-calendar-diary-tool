@@ -466,6 +466,10 @@ public partial class MainWindow : Window
         UpdateModeButtons();
         UpdateSearchPlaceholder();
         RefreshCurrentView();
+        if (mode == ViewMode.Calendar)
+        {
+            FadeInCalendarView();
+        }
     }
 
     private void UpdateSearchPlaceholder()
@@ -707,10 +711,11 @@ public partial class MainWindow : Window
     /// <summary>
     /// 有底板兜底时不加阴影 —— 每个 TextBlock 挂位图特效既脏又贵。
     /// 只有背景几乎全透明（文字直接浮在壁纸上）时才把阴影加回来。
+    /// 次要文字（农历行）传更宽的阈值：它们已经压暗到 0.52，比主文字更早看不清。
     /// </summary>
-    private DropShadowEffect? OptionalTextShadow(double opacity)
+    private DropShadowEffect? OptionalTextShadow(double opacity, double fallbackThreshold = ShadowFallbackThreshold)
     {
-        return _settings.BackgroundOpacity < ShadowFallbackThreshold ? TextShadow(opacity) : null;
+        return _settings.BackgroundOpacity < fallbackThreshold ? TextShadow(opacity) : null;
     }
 
     private DropShadowEffect TextShadow(double opacity)

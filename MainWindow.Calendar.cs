@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -277,7 +278,8 @@ public partial class MainWindow : Window
                 FontWeight = isHighlighted ? FontWeights.SemiBold : FontWeights.Normal,
                 HorizontalAlignment = WpfHorizontalAlignment.Center,
                 VerticalAlignment = WpfVerticalAlignment.Center,
-                Effect = OptionalTextShadow(opacity * 0.7)
+                // 农历行是次要文字（已压暗），比主文字更早看不清 —— 放宽阴影兜底阈值。
+                Effect = OptionalTextShadow(opacity * 0.7, 0.35)
             };
             Grid.SetRow(almanac, 2);
             content.Children.Add(almanac);
@@ -444,7 +446,8 @@ public partial class MainWindow : Window
         TodayLunarLine.Text = lunarLine;
         TodayLunarLine.FontSize = ScaledFont(FontScale.TodayMeta);
         TodayLunarLine.Foreground = TextBrush(opacity * 0.6);
-        TodayLunarLine.Effect = OptionalTextShadow(opacity * 0.6);
+        // 今日块的农历行同属次要文字，与日期格一致放宽阴影兜底阈值。
+        TodayLunarLine.Effect = OptionalTextShadow(opacity * 0.6, 0.35);
         TodayLunarLine.Visibility = lunarLine.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
         RenderTodayHolidayChip(today, opacity);
@@ -586,12 +589,14 @@ public partial class MainWindow : Window
     {
         _visibleMonth = _visibleMonth.AddMonths(-1);
         RenderCalendar();
+        FadeInCalendarView();
     }
 
     private void NextMonth_Click(object sender, RoutedEventArgs e)
     {
         _visibleMonth = _visibleMonth.AddMonths(1);
         RenderCalendar();
+        FadeInCalendarView();
     }
 
     private void Today_Click(object sender, RoutedEventArgs e)
@@ -612,6 +617,7 @@ public partial class MainWindow : Window
 
         _visibleMonth = _visibleMonth.AddMonths(e.Delta > 0 ? -1 : 1);
         RenderCalendar();
+        FadeInCalendarView();
         e.Handled = true;
     }
 
@@ -626,5 +632,27 @@ public partial class MainWindow : Window
         }
 
         RenderCalendar();
+        FadeInCalendarView();
+    }
+
+    /// <summary>
+    /// 翻月 / 切回月历时的轻量淡入：只动面板级 Opacity，不碰布局与缩放
+    /// （缩放会让文字在动画期间发虚 —— 曾因此否掉过 ScaleTransform）。
+    /// 启动首次渲染不走这里，避免开机闪一下。
+    /// </summary>
+    private void FadeInCalendarView()
+    {
+        if (CalendarViewPanel is null || _mode != ViewMode.Calendar)
+        {
+            return;
+        }
+
+        CalendarViewPanel.Opacity = 0.4;
+        CalendarViewPanel.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0.4, 1.0, TimeSpan.FromMilliseconds(140))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
     }
 }
