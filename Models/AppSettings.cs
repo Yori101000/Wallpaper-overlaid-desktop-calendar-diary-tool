@@ -39,6 +39,9 @@ public sealed class AppSettings
     public bool IsLocked { get; set; }
     public bool StartWithMonday { get; set; } = true;
     public double BackgroundOpacity { get; set; } = 0.35;
+
+    /// <summary>面板下垫一层 DWM 亚克力模糊（默认开，背景透明度低时最明显；桌面嵌入模式自动禁用）。</summary>
+    public bool BackgroundBlur { get; set; } = true;
     public bool StartOnBoot { get; set; }
     // 默认必须留空而**不是** WindowLayers.Normal：否则 Normalize() 会把"字段缺失"
     // 误判为"已是合法值"，从而永远不去读旧的 KeepOnTop —— 老用户的置顶设置会被静默丢弃。

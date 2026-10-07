@@ -18,6 +18,7 @@ namespace TransparentCalendar.Native;
 public static class WindowLayerService
 {
     public const int WmWindowPosChanging = 0x0046;
+    public const int WmWindowPosChanged = 0x0047;
 
     private static readonly IntPtr HwndBottom = new(1);
     private const int SwpNoSize = 0x0001;

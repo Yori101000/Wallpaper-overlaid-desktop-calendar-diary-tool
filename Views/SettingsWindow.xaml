@@ -82,6 +82,9 @@
                     BorderThickness="1"/>
             <TextBox x:Name="ColorText" Text="#FFFFFFFF" TextChanged="ColorText_TextChanged"/>
         </DockPanel>
+        <CheckBox x:Name="BgBlurCheck"
+                  Content="面板背景模糊（亚克力）"
+                  ToolTip="采样面板后面的壁纸做模糊垫底，背景透明度低时最明显。关闭则回到现在的扁平半透明底。"/>
 
         <TextBlock Style="{StaticResource DialogSectionTitle}" Text="日历"/>
         <CheckBox x:Name="MondayStartCheck" Content="周一作为一周开始" Margin="0,0,0,8"/>

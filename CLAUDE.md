@@ -255,6 +255,21 @@ $env:TC_WRITE_ICON=1; dotnet test .\Tests\TransparentCalendar.Tests.csproj --fil
 
 中文不要用 `FontWeight.Light`（雅黑 Light 在半透明底上会糊）：日期数字 Medium、周头 SemiBold，只有月份标题这种大字号保留 Light。窗口级 `FontFamily="Microsoft YaHei UI, Segoe UI"`，日期数字加了 `Typography.NumeralAlignment=Tabular` 让 7 列数字等宽。
 
+### 亚克力底（DWM 垫层窗口）
+
+面板下方的模糊**不来自自己采样屏幕**——面板盖住自己的背景，抓"面板后方区域"拿到的是面板上一帧（模糊 + tint），再显示回去形成正反馈，几百帧内收敛成全不透明 tint 色（第一代"亚克力不透光"就是这么来的）。现改为让 DWM 画垫层窗口的背景材质：
+
+- `Native/AcrylicHelper` 是一个原生 Win32 顶层窗口（**不是 WPF 窗口**；用系统 `STATIC` 类建 —— 本机自注册类建窗一律 1407/E_OUTOFMEMORY）：永不擦除、永不绘制（`WM_ERASEBKGND` 返回 1、`WM_PAINT` 直接 `ValidateRect`），建窗只带 `WS_EX_TRANSPARENT`，`WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE` **建窗后**用 `SetWindowLongPtr` 补（作为建窗参数在本机被拒 87），钉在主窗口**正下方**（`WM_WINDOWPOSCHANGING` 里持续 `PinBelowMain`，幂等）。
+- 材质按系统选（注册表 `ProductName` 判断，build 号分不出 Insider 线 —— Win10 Insider 也是 26200）：
+  - **Win11**：`DWMWA_SYSTEMBACKDROP_TYPE(38) = 2`（TABBED，真半透明模糊）。
+  - **Win10**：实测 2/4 都渲染成**不透明平色**（面板整块死灰、一点光都透不进 —— 第二代"亚克力不透光"事故现场），0/1 全透明，**5（MICA_TRANSITIVITY）半透明**（壁纸透光带淡 tint，无模糊）。所以 Win10 用 5。
+  - 属性返回非 0 时回退 `DWMWA_BLURBEHIND(33)`。
+  - 坑：`GetWindowLongPtr` 读回 exstyle **延迟一拍**（日志里看似错位），别按日志修，要外部枚举验证真实值。
+- `MainWindow.SyncAcrylicHelper()` 是唯一对齐点：按需创建/显隐垫层、跟随位置尺寸（物理像素，**内缩 3px**——面板 14px 圆角盖住垫层直角，不露方角糊边；钉 Z 序的 `SetWindowPos` 必须带 `SWP_NOMOVE`，漏了会把垫层拖回屏幕原点）、跟随 `Topmost`。主窗口 `WndProc` 在 `WM_WINDOWPOSCHANGED` 实时同步，300ms 看门狗兜底。
+- **桌面嵌入模式（`WindowLayer=Desktop`）关模糊**：垫层是顶层窗口，进不了 WorkerW，模糊源也不对。
+- 垫层不透明度不另加控件：`TintOverlay`（原 AppSurface 底色渐变）随 `BackgroundOpacity` 变厚就遮住更多模糊——"透光"仍由背景透明度说了算。
+- Win10 下材质 5 与原始壁纸均值只差 ~2 灰阶，**开关差异肉眼不可见**——亚克力的标识观感由 `TintOverlay` 的奶白 veil 承担：`BackgroundBlur` 开时把渐变 panelRGB 按 `BackgroundOpacity*38`（0.63≈9%、拉满≈15%）推向白色，开时呈磨砂奶白、关时 veil 归零，ON/OFF 的可见区别主要来自 veil 而非材质本身。
+
 ### 渲染性能上的既定约束
 
 - 画刷与阴影一律走 `TextBrush()`/`GetBrush()`/`TextShadow()` 的**冻结缓存**，静态画刷也都 `Freeze()` 过。不要在渲染循环里 `new SolidColorBrush` 或 `new DropShadowEffect` —— 一次月历渲染会产生上百个。`ApplySettings()` 负责清缓存。

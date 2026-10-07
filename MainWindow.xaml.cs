@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -138,6 +138,9 @@ public partial class MainWindow : Window
     private ViewMode? _modeBeforeSearch;
     private string _searchText = string.Empty;
     private DispatcherTimer? _searchDebounceTimer;
+    private DispatcherTimer? _acrylicWatchdog;
+    private AcrylicHelper? _acrylicHelper;
+    private bool _acrylicCreating;
     private WpfButton[]? _dayButtons;
     private readonly List<WpfRectangle> _weekendDividers = [];
     private bool _showAllTodos;
@@ -194,6 +197,7 @@ public partial class MainWindow : Window
         ApplySettings();
         RenderCalendar();
         StartDailyRefreshTimer();
+        StartAcrylicWatchdog();
 
         _noteListener = new NoteListenerService(_storage);
         _noteListener.OnNoteReceived += HandleNoteReceived;
@@ -220,6 +224,7 @@ public partial class MainWindow : Window
             _noteListener.OnNoteReceived -= HandleNoteReceived;
             _noteListener.Dispose();
             DisposeTrayIcon();
+            _acrylicHelper?.Dispose();
         };
     }
 
@@ -240,6 +245,77 @@ public partial class MainWindow : Window
             MessageBoxImage.Warning);
     }
 
+    /// <summary>
+    /// 亚克力底：定时采样面板后面的壁纸，"下采样 + 放大"模糊后垫底（见 <see cref="BackdropService"/>）。
+    /// 300ms 足够追上换壁纸 / 拖动 / 缩放，单次采样 ~1ms。
+    /// 定时器只建一次，每 tick 先查设置与可见性再采样，关闭时开销就是两个比较。
+    /// </summary>
+    /// <summary>
+    /// 亚克力底看门狗：主窗口移动 / 缩放 / Z 序变化都在 WndProc 钩子里实时同步，
+    /// 这里定期核一遍，兜住托盘恢复、层级切换等可能漏掉的位置。
+    /// </summary>
+    private void StartAcrylicWatchdog()
+    {
+        _acrylicWatchdog = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        _acrylicWatchdog.Tick += (_, _) => SyncAcrylicHelper();
+        _acrylicWatchdog.Start();
+    }
+
+    /// <summary>
+    /// 对齐 AcrylicHelper 垫层窗口：按需创建 / 显隐、跟随位置尺寸、跟随 Topmost、
+    /// Z 序钉在主窗口正下方。桌面嵌入模式下垫层进不了 WorkerW，直接关模糊。
+    /// </summary>
+    private void SyncAcrylicHelper()
+    {
+        // PresentationSource 不会像 WindowInteropHelper.Handle 那样抢建 HWND
+        // （构造时第一次 ApplySettings 跑在 WndProc 钩子挂上之前）。
+        var mainHwnd = PresentationSource.FromVisual(this) is HwndSource src ? src.Handle : IntPtr.Zero;
+        var want = _settings.BackgroundBlur
+            && mainHwnd != IntPtr.Zero
+            && Visibility == Visibility.Visible
+            && !string.Equals(_settings.WindowLayer, WindowLayers.Desktop, StringComparison.Ordinal);
+
+        if (!want)
+        {
+            _acrylicHelper?.SetVisible(false);
+            return;
+        }
+
+        if (_acrylicHelper is null)
+        {
+            // 垫层窗口 Show() 会惊动主窗口的 Z 序、触发 WM_WINDOWPOSCHANGED 重入这里，
+            // 那时 _acrylicHelper 还没赋值，再 new 一个就是双垫层 —— 用创建标志挡住。
+            if (_acrylicCreating)
+            {
+                return;
+            }
+
+            _acrylicCreating = true;
+            try
+            {
+                var helper = new AcrylicHelper();
+                _acrylicHelper = helper;
+                helper.AttachToMain(mainHwnd);
+            }
+            finally
+            {
+                _acrylicCreating = false;
+            }
+        }
+
+        _acrylicHelper.SetVisible(true);
+        _acrylicHelper.SetTopmost(Topmost);
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var origin = AppSurface.PointToScreen(new WpfPoint(0, 0));
+        var width = (int)Math.Round(AppSurface.ActualWidth * dpi.DpiScaleX);
+        var height = (int)Math.Round(AppSurface.ActualHeight * dpi.DpiScaleY);
+        if (width > 8 && height > 8)
+        {
+            // 内缩 3px：垫层的直角会被面板实色 tint 盖住。
+            _acrylicHelper.Move((int)origin.X + 3, (int)origin.Y + 3, width - 6, height - 6);
+        }
+    }
     private void StartDailyRefreshTimer()
     {
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
@@ -284,11 +360,21 @@ public partial class MainWindow : Window
         var bgAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 255, 0, 255);
         var (panelR, panelG, panelB) = ThemePresets.PanelColorFor(_settings.ThemePreset);
 
+        // 开模糊时额外把 tint 往奶白方向推一层：Win10 的 DWM 半透明材质太淡
+        // （实测差异 ~2 灰阶，肉眼分不出开关），这层浅色磨砂是 Acrylic 的标志性观感，
+        // 让"亚克力开/关"有可见区别。按 BackgroundOpacity 缩放：拉到 0 时它一起消失（纯玻璃）。
+        var veilAlpha = _settings.BackgroundBlur
+            ? (byte)Math.Clamp(_settings.BackgroundOpacity * 38, 0, 255)
+            : (byte)0;
+        var veilR = (byte)(panelR + (255 - panelR) * veilAlpha / 255);
+        var veilG = (byte)(panelG + (255 - panelG) * veilAlpha / 255);
+        var veilB = (byte)(panelB + (255 - panelB) * veilAlpha / 255);
+
         // 底色是克制的垂直渐变：上满、下 72% —— 玻璃受光处稍亮，面才有"厚度"。
         // RGB 不变、只有 alpha 分层，用户调的"背景透明度"不会跑偏。
-        AppSurface.Background = FrozenVerticalGradient(
-            WpfColor.FromArgb(bgAlpha, panelR, panelG, panelB),
-            WpfColor.FromArgb((byte)(bgAlpha * 0.72), panelR, panelG, panelB));
+        TintOverlay.Background = FrozenVerticalGradient(
+            WpfColor.FromArgb(bgAlpha, veilR, veilG, veilB),
+            WpfColor.FromArgb((byte)(bgAlpha * 0.72), veilR, veilG, veilB));
 
         // 边框跟着背景一起淡出：背景全透明时还留一圈白框会很怪。
         // 同样上满下半 —— 下缘自然沉进阴影里。
@@ -305,6 +391,8 @@ public partial class MainWindow : Window
 
         var highlightAlpha = (byte)Math.Clamp(_settings.BackgroundOpacity * 150, 0, 170);
         TopHighlight.Background = FrozenEdgeHighlight(highlightAlpha);
+
+        SyncAcrylicHelper();
 
         // 今日块底色：左缘带 today 色淡 tint、向右淡回原有浅色浮层。
         // 点缀色只取 _todayColor（已按文字色避让过的语义色），不引入新色相。

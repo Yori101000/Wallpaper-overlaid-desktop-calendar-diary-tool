@@ -202,7 +202,7 @@
         <Border x:Name="AppSurface"
                 Margin="20"
                 CornerRadius="14"
-                Background="#50181818"
+                Background="Transparent"
                 BorderBrush="#38FFFFFF"
                 BorderThickness="1">
             <Grid>
@@ -210,6 +210,14 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
+
+        <!-- 亚克力底：DWM 在 AcrylicHelper 垫层窗口（钉在主窗口正下方）画背景模糊，
+             面板透明像素透出来的就是系统材质 + 这块 tint 渐变。
+             设置关闭时垫层隐藏，只剩 tint，外观与改动前一致。 -->
+        <Border x:Name="TintOverlay"
+             Grid.RowSpan="2"
+             CornerRadius="13"
+             Background="#50181818"/>
 
         <!--
             顶栏一行承载全部"操作外壳"：左边是内容相关的月份导航，右边是模式切换与窗口操作。

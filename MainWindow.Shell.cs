@@ -58,6 +58,12 @@ public partial class MainWindow : Window
             KeepInsideDesktopHost(lParam);
         }
 
+        // 亚克力垫层窗口：主窗口移动 / 缩放 / Z 序一变就跟一次，钉在主窗口正下方。
+        if (msg == WindowLayerService.WmWindowPosChanged)
+        {
+            SyncAcrylicHelper();
+        }
+
         return IntPtr.Zero;
     }
 
@@ -367,6 +373,7 @@ public partial class MainWindow : Window
 
         UpdateDesktopWatchdog();
         HideMainWindowFromFastSwitcher();
+        SyncAcrylicHelper();
     }
 
     /// <summary>
@@ -648,12 +655,14 @@ public partial class MainWindow : Window
 
         ApplyWindowLayer();
         Activate();
+        SyncAcrylicHelper();
     }
 
     private void HideWindowToTray()
     {
         SaveWindowSettings();
         Hide();
+        SyncAcrylicHelper();
     }
 
     private void ExitApplication()

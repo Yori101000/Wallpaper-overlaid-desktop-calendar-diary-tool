@@ -69,6 +69,7 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         Settings.BackgroundOpacity = BgOpacitySlider.Value;
+        Settings.BackgroundBlur = BgBlurCheck.IsChecked == true;
         Settings.TextOpacity = OpacitySlider.Value;
         Settings.FontSize = FontSizeSlider.Value;
         Settings.ThemePreset = GetSelectedThemePreset();
@@ -271,6 +272,7 @@ public partial class SettingsWindow : Window
         try
         {
             BgOpacitySlider.Value = Settings.BackgroundOpacity;
+            BgBlurCheck.IsChecked = Settings.BackgroundBlur;
             OpacitySlider.Value = Settings.TextOpacity;
             FontSizeSlider.Value = Settings.FontSize;
             ColorText.Text = Settings.TextColor;
